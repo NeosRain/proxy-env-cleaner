@@ -101,4 +101,4 @@ Thanks to all contributors who have helped with this project!
 
 ---
 
-[1.0.0]: https://github.com/yourusername/proxy-env-cleaner/releases/tag/v1.0.0
+[1.0.0]: https://github.com/NeosRain/proxy-env-cleaner/releases/tag/v1.0.0

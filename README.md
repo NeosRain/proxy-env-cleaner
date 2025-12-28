@@ -2,16 +2,19 @@
 
 <div align="center">
 
-![License](https://img.shields.io/github/license/yourusername/proxy-env-cleaner)
+![License](https://img.shields.io/github/license/NeosRain/proxy-env-cleaner)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue)
 ![Python](https://img.shields.io/badge/python-3.10+-green)
-![Release](https://img.shields.io/github/v/release/yourusername/proxy-env-cleaner)
+![Release](https://img.shields.io/github/v/release/NeosRain/proxy-env-cleaner)
 
 **开机自动清理所有代理环境设置的跨平台工具**
 
 **Cross-platform tool to automatically clean all proxy environment settings on startup**
 
 [English](#english) | [中文](#中文)
+
+[![GitHub stars](https://img.shields.io/github/stars/NeosRain/proxy-env-cleaner?style=social)](https://github.com/NeosRain/proxy-env-cleaner/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/NeosRain/proxy-env-cleaner?style=social)](https://github.com/NeosRain/proxy-env-cleaner/network/members)
 
 </div>
 
@@ -62,7 +65,7 @@ Proxy Environment Cleaner 是一款开源的代理环境清理工具，专为解
 
 #### Windows 安装
 
-1. 从 [Releases](https://github.com/yourusername/proxy-env-cleaner/releases) 下载 `ProxyEnvCleaner.exe`
+1. 从 [Releases](https://github.com/NeosRain/proxy-env-cleaner/releases) 下载 `ProxyEnvCleaner.exe`
 2. 双击运行即可
 3. 程序会自动设置开机自启并最小化到托盘
 
@@ -71,7 +74,7 @@ Proxy Environment Cleaner 是一款开源的代理环境清理工具，专为解
 **Ubuntu/Debian (.deb 包):**
 ```bash
 # 下载 .deb 文件
-wget https://github.com/yourusername/proxy-env-cleaner/releases/latest/download/proxy-env-cleaner_1.0.0_amd64.deb
+wget https://github.com/NeosRain/proxy-env-cleaner/releases/latest/download/proxy-env-cleaner_1.0.0_amd64.deb
 
 # 安装
 sudo dpkg -i proxy-env-cleaner_*.deb
@@ -83,7 +86,7 @@ proxy-env-cleaner
 **其他发行版（二进制文件）:**
 ```bash
 # 下载二进制文件
-wget https://github.com/yourusername/proxy-env-cleaner/releases/latest/download/proxy-env-cleaner
+wget https://github.com/NeosRain/proxy-env-cleaner/releases/latest/download/proxy-env-cleaner
 
 # 赋予执行权限
 chmod +x proxy-env-cleaner
@@ -128,7 +131,7 @@ chmod +x proxy-env-cleaner
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/proxy-env-cleaner.git
+git clone https://github.com/NeosRain/proxy-env-cleaner.git
 cd proxy-env-cleaner
 
 # 安装依赖
@@ -267,7 +270,7 @@ Proxy Environment Cleaner is an open-source tool designed to automatically clean
 
 #### Windows
 
-1. Download `ProxyEnvCleaner.exe` from [Releases](https://github.com/yourusername/proxy-env-cleaner/releases)
+1. Download `ProxyEnvCleaner.exe` from [Releases](https://github.com/NeosRain/proxy-env-cleaner/releases)
 2. Double-click to run
 3. The program will auto-configure startup and minimize to tray
 
@@ -275,14 +278,14 @@ Proxy Environment Cleaner is an open-source tool designed to automatically clean
 
 **Ubuntu/Debian (.deb package):**
 ```bash
-wget https://github.com/yourusername/proxy-env-cleaner/releases/latest/download/proxy-env-cleaner_1.0.0_amd64.deb
+wget https://github.com/NeosRain/proxy-env-cleaner/releases/latest/download/proxy-env-cleaner_1.0.0_amd64.deb
 sudo dpkg -i proxy-env-cleaner_*.deb
 proxy-env-cleaner
 ```
 
 **Other Distributions (binary):**
 ```bash
-wget https://github.com/yourusername/proxy-env-cleaner/releases/latest/download/proxy-env-cleaner
+wget https://github.com/NeosRain/proxy-env-cleaner/releases/latest/download/proxy-env-cleaner
 chmod +x proxy-env-cleaner
 ./proxy-env-cleaner
 ```
@@ -319,7 +322,7 @@ Right-click the system tray icon:
 #### Run from Source
 
 ```bash
-git clone https://github.com/yourusername/proxy-env-cleaner.git
+git clone https://github.com/NeosRain/proxy-env-cleaner.git
 cd proxy-env-cleaner
 pip install -r requirements.txt
 python src/main.py
