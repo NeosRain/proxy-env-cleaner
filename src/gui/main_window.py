@@ -62,11 +62,12 @@ class MainWindow(QMainWindow):
         
         self.status_text = QTextEdit()
         self.status_text.setReadOnly(True)
-        self.status_text.setMaximumHeight(120)
+        self.status_text.setMinimumHeight(100)
         self.status_text.setStyleSheet("""
             QTextEdit {
-                background-color: #f5f5f5;
-                border: 1px solid #ddd;
+                background-color: #1e1e1e;
+                color: #e0e0e0;
+                border: 1px solid #444;
                 border-radius: 5px;
                 padding: 10px;
                 font-family: Consolas, Monaco, monospace;

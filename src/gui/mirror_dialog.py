@@ -65,11 +65,12 @@ class MirrorSettingsDialog(QDialog):
         
         self.status_text = QTextEdit()
         self.status_text.setReadOnly(True)
-        self.status_text.setMaximumHeight(100)
+        self.status_text.setMinimumHeight(80)
         self.status_text.setStyleSheet("""
             QTextEdit {
-                background-color: #f5f5f5;
-                border: 1px solid #ddd;
+                background-color: #1e1e1e;
+                color: #e0e0e0;
+                border: 1px solid #444;
                 border-radius: 3px;
                 font-family: Consolas, Monaco, monospace;
                 font-size: 12px;
@@ -121,6 +122,19 @@ class MirrorSettingsDialog(QDialog):
         pip_layout.addWidget(pip_label)
         pip_layout.addWidget(self.pip_combo, 1)
         select_layout.addLayout(pip_layout)
+        
+        # Snap Mirror
+        snap_layout = QHBoxLayout()
+        snap_label = QLabel("Snap 源:")
+        snap_label.setMinimumWidth(80)
+        self.snap_combo = QComboBox()
+        self.snap_combo.addItem("不修改 / Keep current", None)
+        # 只添加支持 Snap 的镜像源
+        self.snap_combo.addItem("清华大学 / Tsinghua", MirrorProvider.TSINGHUA)
+        self.snap_combo.addItem("中国科技大学 / USTC", MirrorProvider.USTC)
+        snap_layout.addWidget(snap_label)
+        snap_layout.addWidget(self.snap_combo, 1)
+        select_layout.addLayout(snap_layout)
         
         layout.addWidget(select_group)
         
@@ -262,6 +276,7 @@ class MirrorSettingsDialog(QDialog):
             f"APT 源 / APT: {info['apt']}",
             f"NPM 源 / NPM: {info['npm']}",
             f"Pip 源 / Pip: {info['pip']}",
+            f"Snap 源 / Snap: {info['snap']}",
         ]
         self.status_text.setText("\n".join(status_lines))
     
@@ -276,6 +291,12 @@ class MirrorSettingsDialog(QDialog):
         self.pip_combo.setCurrentIndex(
             self.pip_combo.findData(provider)
         )
+        # Snap 只有清华和中科大支持
+        snap_index = self.snap_combo.findData(provider)
+        if snap_index >= 0:
+            self.snap_combo.setCurrentIndex(snap_index)
+        else:
+            self.snap_combo.setCurrentIndex(0)  # 不修改
         self._log(f"已选择: {MIRROR_PROVIDERS[provider].name_zh}")
         self._log(f"Selected: {MIRROR_PROVIDERS[provider].name}")
     
@@ -284,8 +305,9 @@ class MirrorSettingsDialog(QDialog):
         apt_provider = self.apt_combo.currentData()
         npm_provider = self.npm_combo.currentData()
         pip_provider = self.pip_combo.currentData()
+        snap_provider = self.snap_combo.currentData()
         
-        if not any([apt_provider, npm_provider, pip_provider]):
+        if not any([apt_provider, npm_provider, pip_provider, snap_provider]):
             self._log("未选择任何镜像源 / No mirror selected")
             return
         
@@ -307,7 +329,8 @@ class MirrorSettingsDialog(QDialog):
         results = self.mirror_manager.configure_all_mirrors(
             apt_provider=apt_provider,
             npm_provider=npm_provider,
-            pip_provider=pip_provider
+            pip_provider=pip_provider,
+            snap_provider=snap_provider
         )
         
         for key, success in results.items():

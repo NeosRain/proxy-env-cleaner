@@ -1,20 +1,27 @@
 """
 Mirror source manager / 镜像源管理器
-Supports APT, NPM, Pip, Git mirror configuration
-支持 APT、NPM、Pip、Git 镜像源配置
+Supports APT, NPM, Pip, Snap mirror configuration
+支持 APT、NPM、Pip、Snap 镜像源配置
 """
 import os
 import re
+import json
 import shutil
 import tarfile
+import urllib.request
+import urllib.error
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 from ..utils.logger import logger
 from ..utils.config import get_config_dir
+
+
+# 在线配置 URL / Online config URL
+ONLINE_CONFIG_URL = "https://raw.githubusercontent.com/NeosRain/proxy-env-cleaner/main/mirrors.json"
 
 
 class DistroType(Enum):
@@ -66,6 +73,7 @@ class MirrorConfig:
     npm_registry: str
     pip_index: str
     pip_trusted_host: str
+    snap_url: str = ""
     git_url: str = ""
 
 
@@ -78,6 +86,7 @@ MIRROR_PROVIDERS: Dict[MirrorProvider, MirrorConfig] = {
         npm_registry="https://registry.npmmirror.com",
         pip_index="https://pypi.tuna.tsinghua.edu.cn/simple",
         pip_trusted_host="pypi.tuna.tsinghua.edu.cn",
+        snap_url="https://mirrors.tuna.tsinghua.edu.cn/snapcraft",
         git_url="https://mirrors.tuna.tsinghua.edu.cn/git"
     ),
     MirrorProvider.ALIYUN: MirrorConfig(
@@ -87,6 +96,7 @@ MIRROR_PROVIDERS: Dict[MirrorProvider, MirrorConfig] = {
         npm_registry="https://registry.npmmirror.com",
         pip_index="https://mirrors.aliyun.com/pypi/simple",
         pip_trusted_host="mirrors.aliyun.com",
+        snap_url="",
         git_url=""
     ),
     MirrorProvider.USTC: MirrorConfig(
@@ -96,6 +106,7 @@ MIRROR_PROVIDERS: Dict[MirrorProvider, MirrorConfig] = {
         npm_registry="https://registry.npmmirror.com",
         pip_index="https://mirrors.ustc.edu.cn/pypi/web/simple",
         pip_trusted_host="mirrors.ustc.edu.cn",
+        snap_url="https://mirrors.ustc.edu.cn/snapcraft",
         git_url=""
     ),
     MirrorProvider.HUAWEI: MirrorConfig(
@@ -105,6 +116,7 @@ MIRROR_PROVIDERS: Dict[MirrorProvider, MirrorConfig] = {
         npm_registry="https://registry.npmmirror.com",
         pip_index="https://repo.huaweicloud.com/repository/pypi/simple",
         pip_trusted_host="repo.huaweicloud.com",
+        snap_url="",
         git_url=""
     ),
     MirrorProvider.TENCENT: MirrorConfig(
@@ -114,9 +126,51 @@ MIRROR_PROVIDERS: Dict[MirrorProvider, MirrorConfig] = {
         npm_registry="https://mirrors.cloud.tencent.com/npm/",
         pip_index="https://mirrors.cloud.tencent.com/pypi/simple",
         pip_trusted_host="mirrors.cloud.tencent.com",
+        snap_url="",
         git_url=""
     ),
 }
+
+
+def fetch_online_mirrors() -> Optional[Dict]:
+    """从网上获取最新镜像源配置 / Fetch latest mirror config from online"""
+    try:
+        req = urllib.request.Request(
+            ONLINE_CONFIG_URL,
+            headers={'User-Agent': 'ProxyEnvCleaner/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            logger.info("已获取在线镜像源配置 / Online mirror config fetched")
+            return data
+    except urllib.error.URLError as e:
+        logger.warning(f"无法获取在线配置 / Cannot fetch online config: {e}")
+    except json.JSONDecodeError as e:
+        logger.warning(f"解析在线配置失败 / Failed to parse online config: {e}")
+    except Exception as e:
+        logger.warning(f"获取在线配置异常 / Error fetching online config: {e}")
+    return None
+
+
+def get_mirror_config(provider: MirrorProvider, online_data: Optional[Dict] = None) -> MirrorConfig:
+    """获取镜像源配置，优先使用在线数据 / Get mirror config, prefer online data"""
+    # 使用在线数据优先 / Use online data first
+    if online_data and 'providers' in online_data:
+        provider_key = provider.value
+        if provider_key in online_data['providers']:
+            p = online_data['providers'][provider_key]
+            return MirrorConfig(
+                name=p.get('name', MIRROR_PROVIDERS[provider].name),
+                name_zh=p.get('name_zh', MIRROR_PROVIDERS[provider].name_zh),
+                apt_url=p.get('apt_url', MIRROR_PROVIDERS[provider].apt_url),
+                npm_registry=p.get('npm_registry', MIRROR_PROVIDERS[provider].npm_registry),
+                pip_index=p.get('pip_index', MIRROR_PROVIDERS[provider].pip_index),
+                pip_trusted_host=p.get('pip_trusted_host', MIRROR_PROVIDERS[provider].pip_trusted_host),
+                snap_url=p.get('snap_url', MIRROR_PROVIDERS[provider].snap_url),
+                git_url=p.get('git_url', MIRROR_PROVIDERS[provider].git_url),
+            )
+    # 回退到本地配置 / Fallback to local config
+    return MIRROR_PROVIDERS[provider]
 
 
 class MirrorManager:
@@ -131,6 +185,10 @@ class MirrorManager:
     PIP_CONF = Path.home() / ".pip" / "pip.conf"
     PIP_CONF_ALT = Path.home() / ".config" / "pip" / "pip.conf"
     GIT_CONFIG = Path.home() / ".gitconfig"
+    
+    # Snap config / Snap 配置
+    SNAP_AUTH_JSON = Path("/var/snap/snap-store/common/snap-auth.json")
+    SNAPD_ENV = Path("/etc/environment")
     
     # Backup settings / 备份设置
     MAX_BACKUPS = 5
@@ -217,6 +275,7 @@ class MirrorManager:
             "apt": "未检测到 / Not detected",
             "npm": "未检测到 / Not detected",
             "pip": "未检测到 / Not detected",
+            "snap": "未检测到 / Not detected",
         }
         
         # APT
@@ -253,6 +312,21 @@ class MirrorManager:
                         break
                 except Exception:
                     pass
+        
+        # Snap
+        try:
+            env_path = Path("/etc/environment")
+            if env_path.exists():
+                content = env_path.read_text()
+                match = re.search(r'SNAPPY_STORE_NO_CDN\s*=\s*1', content)
+                if match:
+                    info["snap"] = "已配置为不使用CDN / CDN disabled"
+                    # 检查是否配置了镜像
+                    match2 = re.search(r'SNAPPY_STORE_URL\s*=\s*"?([^"\n]+)', content)
+                    if match2:
+                        info["snap"] = match2.group(1)
+        except Exception:
+            pass
         
         return info
     
@@ -493,10 +567,52 @@ trusted-host = {config.pip_trusted_host}
             logger.error(f"Failed to configure Pip mirror: {e}")
             return False
     
+    def configure_snap_mirror(self, provider: MirrorProvider) -> bool:
+        """配置 Snap 镜像源 / Configure Snap mirror"""
+        if provider not in MIRROR_PROVIDERS:
+            return False
+        
+        config = MIRROR_PROVIDERS[provider]
+        
+        if not config.snap_url:
+            logger.warning(f"{config.name} 不支持 Snap 镜像 / {config.name} doesn't support Snap mirror")
+            return False
+        
+        try:
+            env_file = Path("/etc/environment")
+            
+            # Read existing content
+            existing_content = ""
+            if env_file.exists():
+                existing_content = env_file.read_text()
+            
+            # Remove old snap settings
+            lines = []
+            for line in existing_content.splitlines():
+                if not any(x in line for x in ['SNAPPY_STORE_NO_CDN', 'SNAPPY_FORCE_API_URL']):
+                    lines.append(line)
+            
+            # Add new settings
+            # Snap 使用国内源需要设置这两个变量
+            lines.append(f'SNAPPY_FORCE_API_URL="{config.snap_url}"')
+            lines.append('SNAPPY_STORE_NO_CDN=1')
+            
+            env_file.write_text("\n".join(lines) + "\n")
+            logger.info(f"Snap mirror configured: {config.snap_url}")
+            return True
+        
+        except PermissionError:
+            logger.error("需要 root 权限 / Root permission required for Snap")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to configure Snap mirror: {e}")
+            return False
+    
     def configure_all_mirrors(self, 
                               apt_provider: Optional[MirrorProvider] = None,
                               npm_provider: Optional[MirrorProvider] = None,
-                              pip_provider: Optional[MirrorProvider] = None) -> Dict[str, bool]:
+                              pip_provider: Optional[MirrorProvider] = None,
+                              snap_provider: Optional[MirrorProvider] = None) -> Dict[str, bool]:
         """Configure all mirrors / 配置所有镜像源"""
         results = {}
         
@@ -515,6 +631,10 @@ trusted-host = {config.pip_trusted_host}
         # Configure Pip
         if pip_provider:
             results["pip"] = self.configure_pip_mirror(pip_provider)
+        
+        # Configure Snap
+        if snap_provider:
+            results["snap"] = self.configure_snap_mirror(snap_provider)
         
         return results
 
