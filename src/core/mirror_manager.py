@@ -8,6 +8,7 @@ import re
 import json
 import shutil
 import tarfile
+import subprocess
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -184,6 +185,8 @@ class MirrorManager:
     NPM_RC = Path.home() / ".npmrc"
     PIP_CONF = Path.home() / ".pip" / "pip.conf"
     PIP_CONF_ALT = Path.home() / ".config" / "pip" / "pip.conf"
+    # Windows pip config
+    PIP_CONF_WIN = Path(os.environ.get("APPDATA", "")) / "pip" / "pip.ini"
     GIT_CONFIG = Path.home() / ".gitconfig"
     
     # Snap config / Snap 配置
@@ -291,27 +294,56 @@ class MirrorManager:
             except Exception:
                 pass
         
-        # NPM
-        if self.NPM_RC.exists():
-            try:
-                content = self.NPM_RC.read_text()
-                match = re.search(r'registry\s*=\s*(\S+)', content)
-                if match:
-                    info["npm"] = match.group(1)
-            except Exception:
-                pass
-        
-        # Pip
-        for pip_conf in [self.PIP_CONF, self.PIP_CONF_ALT]:
-            if pip_conf.exists():
+        # NPM - 先尝试命令行，再检查文件
+        try:
+            # Windows 需要隐藏窗口
+            creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+            result = subprocess.run(
+                ["npm", "config", "get", "registry"],
+                capture_output=True, text=True, timeout=5,
+                creationflags=creationflags
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                registry = result.stdout.strip()
+                if registry and registry != "undefined":
+                    info["npm"] = registry
+        except Exception:
+            # 回退到文件检测
+            if self.NPM_RC.exists():
                 try:
-                    content = pip_conf.read_text()
-                    match = re.search(r'index-url\s*=\s*(\S+)', content)
+                    content = self.NPM_RC.read_text()
+                    match = re.search(r'registry\s*=\s*(\S+)', content)
                     if match:
-                        info["pip"] = match.group(1)
-                        break
+                        info["npm"] = match.group(1)
                 except Exception:
                     pass
+        
+        # Pip - 先尝试命令行，再检查文件
+        try:
+            creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+            result = subprocess.run(
+                ["pip", "config", "get", "global.index-url"],
+                capture_output=True, text=True, timeout=5,
+                creationflags=creationflags
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                info["pip"] = result.stdout.strip()
+        except Exception:
+            # 回退到文件检测
+            pip_configs = [self.PIP_CONF, self.PIP_CONF_ALT]
+            if os.name == 'nt':
+                pip_configs.insert(0, self.PIP_CONF_WIN)
+            
+            for pip_conf in pip_configs:
+                if pip_conf.exists():
+                    try:
+                        content = pip_conf.read_text()
+                        match = re.search(r'index-url\s*=\s*(\S+)', content)
+                        if match:
+                            info["pip"] = match.group(1)
+                            break
+                    except Exception:
+                        pass
         
         # Snap
         try:

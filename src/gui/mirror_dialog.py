@@ -79,7 +79,35 @@ class MirrorSettingsDialog(QDialog):
         """)
         status_layout.addWidget(self.status_text)
         
-        refresh_btn = QPushButton("刷新状态 / Refresh")
+        refresh_btn = QPushButton("🔄 刷新状态 / Refresh")
+        refresh_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(255, 255, 255, 0.15),
+                    stop:0.5 rgba(255, 255, 255, 0.08),
+                    stop:1 rgba(255, 255, 255, 0.05));
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 8px;
+                padding: 8px 20px;
+                color: #e0e0e0;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(255, 255, 255, 0.25),
+                    stop:0.5 rgba(255, 255, 255, 0.15),
+                    stop:1 rgba(255, 255, 255, 0.1));
+                border: 1px solid rgba(255, 255, 255, 0.35);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(255, 255, 255, 0.05),
+                    stop:1 rgba(255, 255, 255, 0.15));
+                padding-top: 10px;
+                padding-bottom: 6px;
+            }
+        """)
         refresh_btn.clicked.connect(self._refresh_status)
         status_layout.addWidget(refresh_btn)
         
