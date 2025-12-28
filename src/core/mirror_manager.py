@@ -273,110 +273,63 @@ class MirrorManager:
         return sources
     
     def get_current_mirror_info(self) -> Dict[str, str]:
-        """获取所有包管理器当前镜像信息 / Get current mirror info for all package managers"""
+        """Get current mirror info for all package managers / 获取所有包管理器当前镜像信息"""
         info = {
             "apt": "未检测到 / Not detected",
             "npm": "未检测到 / Not detected",
             "pip": "未检测到 / Not detected",
-            "yarn": "未检测到 / Not detected",
             "snap": "未检测到 / Not detected",
         }
         
-        creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
-        
-        # APT - Linux only
-        if os.name != 'nt' and self.SOURCES_LIST.exists():
+        # APT
+        if self.SOURCES_LIST.exists():
             try:
                 content = self.SOURCES_LIST.read_text()
                 for line in content.splitlines():
-                    if line.strip().startswith('deb ') and not line.strip().startswith('#'):
+                    if line.strip().startswith('deb '):
                         match = re.search(r'https?://([^/\s]+)', line)
                         if match:
                             info["apt"] = match.group(1)
                             break
             except Exception:
                 pass
-        elif os.name == 'nt':
-            info["apt"] = "N/A (Windows)"
         
-        # NPM - 多种检测方式
-        npm_detected = False
-        # 方法 1: npm config get registry
+        # NPM - 先尝试命令行，再检查文件
         try:
+            # Windows 需要隐藏窗口
+            creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
             result = subprocess.run(
                 ["npm", "config", "get", "registry"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, text=True, timeout=5,
                 creationflags=creationflags
             )
             if result.returncode == 0 and result.stdout.strip():
                 registry = result.stdout.strip()
-                if registry and registry != "undefined" and "http" in registry:
+                if registry and registry != "undefined":
                     info["npm"] = registry
-                    npm_detected = True
         except Exception:
-            pass
-        
-        # 方法 2: 检查 .npmrc 文件
-        if not npm_detected and self.NPM_RC.exists():
-            try:
-                content = self.NPM_RC.read_text()
-                match = re.search(r'registry\s*=\s*"?([^"\s\n]+)', content)
-                if match:
-                    info["npm"] = match.group(1)
-                    npm_detected = True
-            except Exception:
-                pass
-        
-        # 方法 3: npm config list 
-        if not npm_detected:
-            try:
-                result = subprocess.run(
-                    ["npm", "config", "list"],
-                    capture_output=True, text=True, timeout=10,
-                    creationflags=creationflags
-                )
-                if result.returncode == 0:
-                    match = re.search(r'registry\s*=\s*"?([^"\s\n]+)', result.stdout)
+            # 回退到文件检测
+            if self.NPM_RC.exists():
+                try:
+                    content = self.NPM_RC.read_text()
+                    match = re.search(r'registry\s*=\s*(\S+)', content)
                     if match:
                         info["npm"] = match.group(1)
-            except Exception:
-                pass
+                except Exception:
+                    pass
         
-        # Pip - 多种检测方式
-        pip_detected = False
-        # 方法 1: pip config get global.index-url
+        # Pip - 先尝试命令行，再检查文件
         try:
+            creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
             result = subprocess.run(
                 ["pip", "config", "get", "global.index-url"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, text=True, timeout=5,
                 creationflags=creationflags
             )
             if result.returncode == 0 and result.stdout.strip():
-                url = result.stdout.strip()
-                if "http" in url:
-                    info["pip"] = url
-                    pip_detected = True
+                info["pip"] = result.stdout.strip()
         except Exception:
-            pass
-        
-        # 方法 2: pip config list
-        if not pip_detected:
-            try:
-                result = subprocess.run(
-                    ["pip", "config", "list"],
-                    capture_output=True, text=True, timeout=10,
-                    creationflags=creationflags
-                )
-                if result.returncode == 0:
-                    match = re.search(r"global\.index-url\s*=\s*'?([^'\s\n]+)", result.stdout)
-                    if match:
-                        info["pip"] = match.group(1)
-                        pip_detected = True
-            except Exception:
-                pass
-        
-        # 方法 3: 检查配置文件
-        if not pip_detected:
+            # 回退到文件检测
             pip_configs = [self.PIP_CONF, self.PIP_CONF_ALT]
             if os.name == 'nt':
                 pip_configs.insert(0, self.PIP_CONF_WIN)
@@ -385,42 +338,27 @@ class MirrorManager:
                 if pip_conf.exists():
                     try:
                         content = pip_conf.read_text()
-                        match = re.search(r'index-url\s*=\s*(\S+)', content, re.IGNORECASE)
+                        match = re.search(r'index-url\s*=\s*(\S+)', content)
                         if match:
                             info["pip"] = match.group(1)
                             break
                     except Exception:
                         pass
         
-        # Yarn 检测
+        # Snap
         try:
-            result = subprocess.run(
-                ["yarn", "config", "get", "registry"],
-                capture_output=True, text=True, timeout=10,
-                creationflags=creationflags
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                registry = result.stdout.strip()
-                if "http" in registry:
-                    info["yarn"] = registry
+            env_path = Path("/etc/environment")
+            if env_path.exists():
+                content = env_path.read_text()
+                match = re.search(r'SNAPPY_STORE_NO_CDN\s*=\s*1', content)
+                if match:
+                    info["snap"] = "已配置为不使用CDN / CDN disabled"
+                    # 检查是否配置了镜像
+                    match2 = re.search(r'SNAPPY_STORE_URL\s*=\s*"?([^"\n]+)', content)
+                    if match2:
+                        info["snap"] = match2.group(1)
         except Exception:
             pass
-        
-        # Snap - Linux only
-        if os.name != 'nt':
-            try:
-                env_path = Path("/etc/environment")
-                if env_path.exists():
-                    content = env_path.read_text()
-                    match = re.search(r'SNAPPY_FORCE_API_URL\s*=\s*"?([^"\n]+)', content)
-                    if match:
-                        info["snap"] = match.group(1)
-                    elif re.search(r'SNAPPY_STORE_NO_CDN\s*=\s*1', content):
-                        info["snap"] = "CDN 已禁用 / CDN disabled"
-            except Exception:
-                pass
-        else:
-            info["snap"] = "N/A (Windows)"
         
         return info
     
@@ -613,69 +551,27 @@ class MirrorManager:
             return False
         
         config = MIRROR_PROVIDERS[provider]
-        creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
         
-        # 检查是否已经是目标镜像源
         try:
-            result = subprocess.run(
-                ["npm", "config", "get", "registry"],
-                capture_output=True, text=True, timeout=10,
-                creationflags=creationflags
-            )
-            if result.returncode == 0:
-                current = result.stdout.strip()
-                if config.npm_registry in current:
-                    logger.info(f"NPM 已经是 {config.name} 镜像 / NPM already using {config.name}")
-                    return True
-        except Exception:
-            pass
-        
-        success = False
-        
-        # 方法 1: 使用命令行设置
-        try:
-            result = subprocess.run(
-                ["npm", "config", "set", "registry", config.npm_registry],
-                capture_output=True, text=True, timeout=15,
-                creationflags=creationflags
-            )
-            if result.returncode == 0:
-                success = True
-                logger.info(f"NPM mirror set via command: {config.npm_registry}")
-        except Exception as e:
-            logger.warning(f"npm config set failed: {e}")
-        
-        # 方法 2: 同时写入文件以确保生效
-        try:
+            # Read existing config or create new
             existing_content = ""
             if self.NPM_RC.exists():
                 existing_content = self.NPM_RC.read_text()
             
+            # Remove old registry line
             lines = [l for l in existing_content.splitlines() 
                      if not l.strip().startswith('registry')]
+            
+            # Add new registry
             lines.insert(0, f"registry={config.npm_registry}")
             
-            self.NPM_RC.write_text("\n".join(lines) + "\n")
-            success = True
-            logger.info(f"NPM mirror written to file: {config.npm_registry}")
+            self.NPM_RC.write_text("\n".join(lines))
+            logger.info(f"NPM mirror configured: {config.npm_registry}")
+            return True
+        
         except Exception as e:
-            logger.warning(f"Failed to write .npmrc: {e}")
-        
-        # 验证配置是否成功
-        if success:
-            try:
-                result = subprocess.run(
-                    ["npm", "config", "get", "registry"],
-                    capture_output=True, text=True, timeout=10,
-                    creationflags=creationflags
-                )
-                if result.returncode == 0 and config.npm_registry in result.stdout:
-                    logger.info("✅ NPM 镜像配置验证成功 / NPM mirror verified")
-                    return True
-            except Exception:
-                pass
-        
-        return success
+            logger.error(f"Failed to configure NPM mirror: {e}")
+            return False
     
     def configure_pip_mirror(self, provider: MirrorProvider) -> bool:
         """Configure Pip mirror / 配置 Pip 镜像源"""
@@ -683,50 +579,9 @@ class MirrorManager:
             return False
         
         config = MIRROR_PROVIDERS[provider]
-        creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
         
-        # 检查是否已经是目标镜像源
         try:
-            result = subprocess.run(
-                ["pip", "config", "get", "global.index-url"],
-                capture_output=True, text=True, timeout=10,
-                creationflags=creationflags
-            )
-            if result.returncode == 0:
-                current = result.stdout.strip()
-                if config.pip_index in current:
-                    logger.info(f"Pip 已经是 {config.name} 镜像 / Pip already using {config.name}")
-                    return True
-        except Exception:
-            pass
-        
-        success = False
-        
-        # 方法 1: 使用命令行设置
-        try:
-            subprocess.run(
-                ["pip", "config", "set", "global.index-url", config.pip_index],
-                capture_output=True, text=True, timeout=15,
-                creationflags=creationflags
-            )
-            subprocess.run(
-                ["pip", "config", "set", "global.trusted-host", config.pip_trusted_host],
-                capture_output=True, text=True, timeout=15,
-                creationflags=creationflags
-            )
-            success = True
-            logger.info(f"Pip mirror set via command: {config.pip_index}")
-        except Exception as e:
-            logger.warning(f"pip config set failed: {e}")
-        
-        # 方法 2: 写入配置文件
-        try:
-            # Windows 使用 pip.ini，Linux 使用 pip.conf
-            if os.name == 'nt':
-                pip_conf = self.PIP_CONF_WIN
-            else:
-                pip_conf = self.PIP_CONF
-            
+            pip_conf = self.PIP_CONF
             pip_conf.parent.mkdir(parents=True, exist_ok=True)
             
             content = f"""[global]
@@ -737,26 +592,12 @@ trusted-host = {config.pip_trusted_host}
 trusted-host = {config.pip_trusted_host}
 """
             pip_conf.write_text(content)
-            success = True
-            logger.info(f"Pip config written to: {pip_conf}")
+            logger.info(f"Pip mirror configured: {config.pip_index}")
+            return True
+        
         except Exception as e:
-            logger.warning(f"Failed to write pip config: {e}")
-        
-        # 验证配置是否成功
-        if success:
-            try:
-                result = subprocess.run(
-                    ["pip", "config", "get", "global.index-url"],
-                    capture_output=True, text=True, timeout=10,
-                    creationflags=creationflags
-                )
-                if result.returncode == 0 and config.pip_index in result.stdout:
-                    logger.info("✅ Pip 镜像配置验证成功 / Pip mirror verified")
-                    return True
-            except Exception:
-                pass
-        
-        return success
+            logger.error(f"Failed to configure Pip mirror: {e}")
+            return False
     
     def configure_snap_mirror(self, provider: MirrorProvider) -> bool:
         """配置 Snap 镜像源 / Configure Snap mirror"""
