@@ -12,6 +12,7 @@ from PyQt6.QtGui import QFont, QCloseEvent
 from PyQt6.QtCore import Qt, QTimer
 
 from .tray_icon import TrayIcon
+from .mirror_dialog import MirrorSettingsDialog
 from ..core.detector import detect_proxy_settings, clean_all_proxy, get_cleaner
 from ..core.cleaner_base import CleanReport, DetectResult, CleanStatus
 from ..utils.config import config
@@ -168,6 +169,30 @@ class MainWindow(QMainWindow):
         
         layout.addLayout(btn_layout)
         
+        # Mirror settings button / 镜像源设置按钮
+        mirror_btn = QPushButton("镜像源管理 / Mirror Settings")
+        mirror_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #9b59b6;
+                color: white;
+                border: none;
+                padding: 10px 25px;
+                border-radius: 5px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #8e44ad;
+            }
+            QPushButton:pressed {
+                background-color: #6c3483;
+                padding-top: 12px;
+                padding-bottom: 8px;
+            }
+        """)
+        mirror_btn.clicked.connect(self._open_mirror_settings)
+        layout.addWidget(mirror_btn)
+        
         # Log group / 日志分组
         log_group = QGroupBox("操作日志 / Operation Log")
         log_layout = QVBoxLayout(log_group)
@@ -218,6 +243,11 @@ class MainWindow(QMainWindow):
         if self.tray:
             self.tray.hide()
         QApplication.quit()
+    
+    def _open_mirror_settings(self) -> None:
+        """打开镜像源设置对话框 / Open mirror settings dialog"""
+        dialog = MirrorSettingsDialog(self)
+        dialog.exec()
     
     def _refresh_status(self) -> None:
         """Refresh proxy status / 刷新代理状态"""
