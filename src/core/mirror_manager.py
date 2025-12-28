@@ -273,63 +273,110 @@ class MirrorManager:
         return sources
     
     def get_current_mirror_info(self) -> Dict[str, str]:
-        """Get current mirror info for all package managers / 获取所有包管理器当前镜像信息"""
+        """获取所有包管理器当前镜像信息 / Get current mirror info for all package managers"""
         info = {
             "apt": "未检测到 / Not detected",
             "npm": "未检测到 / Not detected",
             "pip": "未检测到 / Not detected",
+            "yarn": "未检测到 / Not detected",
             "snap": "未检测到 / Not detected",
         }
         
-        # APT
-        if self.SOURCES_LIST.exists():
+        creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+        
+        # APT - Linux only
+        if os.name != 'nt' and self.SOURCES_LIST.exists():
             try:
                 content = self.SOURCES_LIST.read_text()
                 for line in content.splitlines():
-                    if line.strip().startswith('deb '):
+                    if line.strip().startswith('deb ') and not line.strip().startswith('#'):
                         match = re.search(r'https?://([^/\s]+)', line)
                         if match:
                             info["apt"] = match.group(1)
                             break
             except Exception:
                 pass
+        elif os.name == 'nt':
+            info["apt"] = "N/A (Windows)"
         
-        # NPM - 先尝试命令行，再检查文件
+        # NPM - 多种检测方式
+        npm_detected = False
+        # 方法 1: npm config get registry
         try:
-            # Windows 需要隐藏窗口
-            creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
             result = subprocess.run(
                 ["npm", "config", "get", "registry"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True, text=True, timeout=10,
                 creationflags=creationflags
             )
             if result.returncode == 0 and result.stdout.strip():
                 registry = result.stdout.strip()
-                if registry and registry != "undefined":
+                if registry and registry != "undefined" and "http" in registry:
                     info["npm"] = registry
+                    npm_detected = True
         except Exception:
-            # 回退到文件检测
-            if self.NPM_RC.exists():
-                try:
-                    content = self.NPM_RC.read_text()
-                    match = re.search(r'registry\s*=\s*(\S+)', content)
+            pass
+        
+        # 方法 2: 检查 .npmrc 文件
+        if not npm_detected and self.NPM_RC.exists():
+            try:
+                content = self.NPM_RC.read_text()
+                match = re.search(r'registry\s*=\s*"?([^"\s\n]+)', content)
+                if match:
+                    info["npm"] = match.group(1)
+                    npm_detected = True
+            except Exception:
+                pass
+        
+        # 方法 3: npm config list 
+        if not npm_detected:
+            try:
+                result = subprocess.run(
+                    ["npm", "config", "list"],
+                    capture_output=True, text=True, timeout=10,
+                    creationflags=creationflags
+                )
+                if result.returncode == 0:
+                    match = re.search(r'registry\s*=\s*"?([^"\s\n]+)', result.stdout)
                     if match:
                         info["npm"] = match.group(1)
-                except Exception:
-                    pass
+            except Exception:
+                pass
         
-        # Pip - 先尝试命令行，再检查文件
+        # Pip - 多种检测方式
+        pip_detected = False
+        # 方法 1: pip config get global.index-url
         try:
-            creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
             result = subprocess.run(
                 ["pip", "config", "get", "global.index-url"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True, text=True, timeout=10,
                 creationflags=creationflags
             )
             if result.returncode == 0 and result.stdout.strip():
-                info["pip"] = result.stdout.strip()
+                url = result.stdout.strip()
+                if "http" in url:
+                    info["pip"] = url
+                    pip_detected = True
         except Exception:
-            # 回退到文件检测
+            pass
+        
+        # 方法 2: pip config list
+        if not pip_detected:
+            try:
+                result = subprocess.run(
+                    ["pip", "config", "list"],
+                    capture_output=True, text=True, timeout=10,
+                    creationflags=creationflags
+                )
+                if result.returncode == 0:
+                    match = re.search(r"global\.index-url\s*=\s*'?([^'\s\n]+)", result.stdout)
+                    if match:
+                        info["pip"] = match.group(1)
+                        pip_detected = True
+            except Exception:
+                pass
+        
+        # 方法 3: 检查配置文件
+        if not pip_detected:
             pip_configs = [self.PIP_CONF, self.PIP_CONF_ALT]
             if os.name == 'nt':
                 pip_configs.insert(0, self.PIP_CONF_WIN)
@@ -338,27 +385,42 @@ class MirrorManager:
                 if pip_conf.exists():
                     try:
                         content = pip_conf.read_text()
-                        match = re.search(r'index-url\s*=\s*(\S+)', content)
+                        match = re.search(r'index-url\s*=\s*(\S+)', content, re.IGNORECASE)
                         if match:
                             info["pip"] = match.group(1)
                             break
                     except Exception:
                         pass
         
-        # Snap
+        # Yarn 检测
         try:
-            env_path = Path("/etc/environment")
-            if env_path.exists():
-                content = env_path.read_text()
-                match = re.search(r'SNAPPY_STORE_NO_CDN\s*=\s*1', content)
-                if match:
-                    info["snap"] = "已配置为不使用CDN / CDN disabled"
-                    # 检查是否配置了镜像
-                    match2 = re.search(r'SNAPPY_STORE_URL\s*=\s*"?([^"\n]+)', content)
-                    if match2:
-                        info["snap"] = match2.group(1)
+            result = subprocess.run(
+                ["yarn", "config", "get", "registry"],
+                capture_output=True, text=True, timeout=10,
+                creationflags=creationflags
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                registry = result.stdout.strip()
+                if "http" in registry:
+                    info["yarn"] = registry
         except Exception:
             pass
+        
+        # Snap - Linux only
+        if os.name != 'nt':
+            try:
+                env_path = Path("/etc/environment")
+                if env_path.exists():
+                    content = env_path.read_text()
+                    match = re.search(r'SNAPPY_FORCE_API_URL\s*=\s*"?([^"\n]+)', content)
+                    if match:
+                        info["snap"] = match.group(1)
+                    elif re.search(r'SNAPPY_STORE_NO_CDN\s*=\s*1', content):
+                        info["snap"] = "CDN 已禁用 / CDN disabled"
+            except Exception:
+                pass
+        else:
+            info["snap"] = "N/A (Windows)"
         
         return info
     

@@ -83,29 +83,30 @@ class MirrorSettingsDialog(QDialog):
         refresh_btn.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(255, 255, 255, 0.15),
-                    stop:0.5 rgba(255, 255, 255, 0.08),
-                    stop:1 rgba(255, 255, 255, 0.05));
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                border-radius: 8px;
-                padding: 8px 20px;
-                color: #e0e0e0;
-                font-size: 13px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                     stop:0 rgba(255, 255, 255, 0.25),
                     stop:0.5 rgba(255, 255, 255, 0.15),
                     stop:1 rgba(255, 255, 255, 0.1));
-                border: 1px solid rgba(255, 255, 255, 0.35);
+                border: 1px solid rgba(200, 200, 200, 0.3);
+                border-radius: 10px;
+                padding: 10px 25px;
+                color: #333333;
+                font-size: 14px;
+                font-weight: bold;
+                text-shadow: 0 1px 1px rgba(255, 255, 255, 0.5);
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(255, 255, 255, 0.35),
+                    stop:0.5 rgba(255, 255, 255, 0.25),
+                    stop:1 rgba(255, 255, 255, 0.2));
+                border: 1px solid rgba(200, 200, 200, 0.4);
             }
             QPushButton:pressed {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(255, 255, 255, 0.05),
-                    stop:1 rgba(255, 255, 255, 0.15));
-                padding-top: 10px;
-                padding-bottom: 6px;
+                    stop:0 rgba(200, 200, 200, 0.1),
+                    stop:1 rgba(200, 200, 200, 0.2));
+                padding-top: 12px;
+                padding-bottom: 8px;
             }
         """)
         refresh_btn.clicked.connect(self._refresh_status)
@@ -308,21 +309,26 @@ class MirrorSettingsDialog(QDialog):
     
     def _refresh_status(self) -> None:
         """Refresh current mirror status / 刷新当前镜像状态"""
-        info = self.mirror_manager.get_current_mirror_info()
-        distro, release = self.mirror_manager.detect_distro()
-        
-        status_lines = [
-            "═══ 系统信息 / System Info ═══",
-            f"   发行版 / Distro:  {distro.value.upper()} {release}",
-            "",
-            "═══ 当前镜像源 / Current Mirrors ═══",
-            f"   APT:   {info['apt']}",
-            f"   NPM:   {info['npm']}",
-            f"   Yarn:  {info['yarn']}",
-            f"   Pip:   {info['pip']}",
-            f"   Snap:  {info['snap']}",
-        ]
-        self.status_text.setText("\n".join(status_lines))
+        try:
+            info = self.mirror_manager.get_current_mirror_info()
+            distro, release = self.mirror_manager.detect_distro()
+            
+            status_lines = [
+                "═══ 系统信息 / System Info ═══",
+                f"   发行版 / Distro:  {distro.value.upper()} {release}",
+                "",
+                "═══ 当前镜像源 / Current Mirrors ═══",
+                f"   APT:   {info['apt']}",
+                f"   NPM:   {info['npm']}",
+                f"   Yarn:  {info['yarn']}",
+                f"   Pip:   {info['pip']}",
+                f"   Snap:  {info['snap']}",
+            ]
+            self.status_text.setText("\n".join(status_lines))
+        except Exception as e:
+            error_msg = f"❌ 刷新状态失败 / Refresh failed: {str(e)}"
+            self.status_text.setText(error_msg)
+            logger.error(f"Failed to refresh status: {e}")
     
     def _quick_config(self, provider: MirrorProvider) -> None:
         """Quick config all mirrors / 快速配置所有镜像"""

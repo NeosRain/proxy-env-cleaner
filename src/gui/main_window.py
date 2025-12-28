@@ -247,8 +247,12 @@ class MainWindow(QMainWindow):
     
     def _open_mirror_settings(self) -> None:
         """打开镜像源设置对话框 / Open mirror settings dialog"""
-        dialog = MirrorSettingsDialog(self)
-        dialog.exec()
+        try:
+            dialog = MirrorSettingsDialog(self)
+            dialog.exec()
+        except Exception as e:
+            QMessageBox.critical(self, "错误 / Error", f"打开镜像源管理器失败:\nFailed to open mirror manager:\n{str(e)}")
+            logger.error(f"Failed to open mirror settings: {e}")
     
     def _refresh_status(self) -> None:
         """Refresh proxy status / 刷新代理状态"""
