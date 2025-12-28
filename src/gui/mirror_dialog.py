@@ -241,106 +241,35 @@ class MirrorManager:
         return info
 
 
-class MirrorSettingsDialog:
-    """Mirror settings dialog using tkinter / 使用tkinter的镜像设置对话框"""
+def show_mirror_settings(parent=None):
+    """Show mirror settings dialog / 显示镜像设置对话框"""
+    root = tk.Tk() if parent is None else tk.Toplevel()
+    root.title("镜像源管理 / Mirror Settings")
+    root.geometry("700x600")
     
-    def __init__(self, parent=None):
-        self.parent = parent
-        self.mirror_manager = MirrorManager()
-        self.root = tk.Toplevel(parent) if parent else tk.Tk()
-        self.root.title("镜像源管理 / Mirror Settings")
-        self.root.geometry("700x600")
-        
-        # 设置窗口图标和样式
-        self.setup_ui()
-        
-    def setup_ui(self):
-        """Setup the UI / 设置界面"""
-        # 创建主框架
-        main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        
-        # 状态显示区域
-        status_frame = ttk.LabelFrame(main_frame, text="状态信息 / Status Info", padding="10")
-        status_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N), pady=(0, 10))
-        
-        # 状态文本框
-        self.status_text = scrolledtext.ScrolledText(status_frame, height=8, width=70)
-        self.status_text.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E))
-        
-        # 刷新状态按钮
-        refresh_btn = ttk.Button(status_frame, text="🔄 刷新状态 / Refresh Status", command=self.refresh_status)
-        refresh_btn.grid(row=1, column=0, pady=5, sticky=tk.W)
-        
-        # 镜像源选择区域
-        select_frame = ttk.LabelFrame(main_frame, text="选择镜像源 / Select Mirror", padding="10")
-        select_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N), pady=(0, 10))
-        
-        # APT 镜像源
-        ttk.Label(select_frame, text="APT 源:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
-        self.apt_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"], state="readonly")
-        self.apt_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
-        self.apt_combo.set("不修改 / Keep current")
-        
-        # NPM 镜像源
-        ttk.Label(select_frame, text="NPM 源:").grid(row=1, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
-        self.npm_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "淘宝源 / Taobao"], state="readonly")
-        self.npm_combo.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(0, 10), pady=(5, 0))
-        self.npm_combo.set("不修改 / Keep current")
-        
-        # Pip 镜像源
-        ttk.Label(select_frame, text="Pip 源:").grid(row=2, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
-        self.pip_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"], state="readonly")
-        self.pip_combo.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=(0, 10), pady=(5, 0))
-        self.pip_combo.set("不修改 / Keep current")
-        
-        # Snap 镜像源
-        ttk.Label(select_frame, text="Snap 源:").grid(row=3, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
-        self.snap_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "清华源 / Tsinghua", "中科大源 / USTC"], state="readonly")
-        self.snap_combo.grid(row=3, column=1, sticky=(tk.W, tk.E), padx=(0, 10), pady=(5, 0))
-        self.snap_combo.set("不修改 / Keep current")
-        
-        # Yarn 镜像源
-        ttk.Label(select_frame, text="Yarn 源:").grid(row=4, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
-        self.yarn_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "淘宝源 / Taobao"], state="readonly")
-        self.yarn_combo.grid(row=4, column=1, sticky=(tk.W, tk.E), padx=(0, 10), pady=(5, 0))
-        self.yarn_combo.set("不修改 / Keep current")
-        
-        # 快速配置按钮
-        quick_frame = ttk.Frame(select_frame)
-        quick_frame.grid(row=5, column=0, columnspan=2, pady=(10, 0))
-        
-        ttk.Button(quick_frame, text="全部使用清华源", command=lambda: self.quick_config("清华源 / Tsinghua")).grid(row=0, column=0, padx=(0, 5))
-        ttk.Button(quick_frame, text="全部使用阿里源", command=lambda: self.quick_config("阿里源 / Aliyun")).grid(row=0, column=1, padx=(0, 5))
-        ttk.Button(quick_frame, text="全部使用中科大", command=lambda: self.quick_config("中科大源 / USTC")).grid(row=0, column=2)
-        
-        # 应用配置按钮
-        apply_btn = ttk.Button(main_frame, text="应用配置 / Apply Config", command=self.apply_config)
-        apply_btn.grid(row=2, column=0, pady=10)
-        
-        # 日志区域
-        log_frame = ttk.LabelFrame(main_frame, text="操作日志 / Operation Log", padding="10")
-        log_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0))
-        
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=8, width=70)
-        self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        
-        # 配置行权重
-        main_frame.columnconfigure(0, weight=1)
-        main_frame.rowconfigure(3, weight=1)
-        status_frame.columnconfigure(0, weight=1)
-        select_frame.columnconfigure(1, weight=1)
-        log_frame.columnconfigure(0, weight=1)
-        log_frame.rowconfigure(0, weight=1)
-        
-        # 刷新初始状态
-        self.refresh_status()
+    # 创建镜像管理器实例
+    mirror_manager = MirrorManager()
     
-    def refresh_status(self):
-        """Refresh current mirror status / 刷新当前镜像状态"""
+    # 设置UI
+    main_frame = ttk.Frame(root, padding="10")
+    main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+    main_frame.columnconfigure(0, weight=1)
+    main_frame.rowconfigure(3, weight=1)
+    
+    # 状态显示区域
+    status_frame = ttk.LabelFrame(main_frame, text="状态信息 / Status Info", padding="10")
+    status_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N), pady=(0, 10))
+    status_frame.columnconfigure(0, weight=1)
+    
+    # 状态文本框
+    status_text = scrolledtext.ScrolledText(status_frame, height=8, width=70)
+    status_text.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E))
+    
+    # 刷新状态按钮
+    def refresh_status():
         try:
-            info = self.mirror_manager.get_current_mirror_info()
-            distro, release = self.mirror_manager.detect_distro()
+            info = mirror_manager.get_current_mirror_info()
+            distro, release = mirror_manager.detect_distro()
             
             status_lines = [
                 "═══ 系统信息 / System Info ═══",
@@ -353,32 +282,77 @@ class MirrorSettingsDialog:
                 f"   Pip:   {info['pip']}",
                 f"   Snap:  {info['snap']}",
             ]
-            self.status_text.delete(1.0, tk.END)
-            self.status_text.insert(tk.END, "\n".join(status_lines))
+            status_text.delete(1.0, tk.END)
+            status_text.insert(tk.END, "\n".join(status_lines))
         except Exception as e:
             error_msg = f"❌ 刷新状态失败 / Refresh failed: {str(e)}"
-            self.status_text.delete(1.0, tk.END)
-            self.status_text.insert(tk.END, error_msg)
+            status_text.delete(1.0, tk.END)
+            status_text.insert(tk.END, error_msg)
     
-    def quick_config(self, provider_name):
-        """Quick config all mirrors / 快速配置所有镜像"""
+    refresh_btn = ttk.Button(status_frame, text="🔄 刷新状态 / Refresh Status", command=refresh_status)
+    refresh_btn.grid(row=1, column=0, pady=5, sticky=tk.W)
+    
+    # 镜像源选择区域
+    select_frame = ttk.LabelFrame(main_frame, text="选择镜像源 / Select Mirror", padding="10")
+    select_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N), pady=(0, 10))
+    select_frame.columnconfigure(1, weight=1)
+    
+    # APT 镜像源
+    ttk.Label(select_frame, text="APT 源:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+    apt_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"], state="readonly")
+    apt_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
+    apt_combo.set("不修改 / Keep current")
+    
+    # NPM 镜像源
+    ttk.Label(select_frame, text="NPM 源:").grid(row=1, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+    npm_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "淘宝源 / Taobao"], state="readonly")
+    npm_combo.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(0, 10), pady=(5, 0))
+    npm_combo.set("不修改 / Keep current")
+    
+    # Pip 镜像源
+    ttk.Label(select_frame, text="Pip 源:").grid(row=2, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+    pip_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"], state="readonly")
+    pip_combo.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=(0, 10), pady=(5, 0))
+    pip_combo.set("不修改 / Keep current")
+    
+    # Snap 镜像源
+    ttk.Label(select_frame, text="Snap 源:").grid(row=3, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+    snap_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "清华源 / Tsinghua", "中科大源 / USTC"], state="readonly")
+    snap_combo.grid(row=3, column=1, sticky=(tk.W, tk.E), padx=(0, 10), pady=(5, 0))
+    snap_combo.set("不修改 / Keep current")
+    
+    # Yarn 镜像源
+    ttk.Label(select_frame, text="Yarn 源:").grid(row=4, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+    yarn_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "淘宝源 / Taobao"], state="readonly")
+    yarn_combo.grid(row=4, column=1, sticky=(tk.W, tk.E), padx=(0, 10), pady=(5, 0))
+    yarn_combo.set("不修改 / Keep current")
+    
+    # 快速配置按钮
+    quick_frame = ttk.Frame(select_frame)
+    quick_frame.grid(row=5, column=0, columnspan=2, pady=(10, 0))
+    
+    def quick_config(provider_name):
         # 根据选择的提供商设置所有下拉框
-        self.apt_combo.set(provider_name if provider_name in ["清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"] else "不修改 / Keep current")
-        self.npm_combo.set("淘宝源 / Taobao" if "淘宝" in provider_name else "不修改 / Keep current")
-        self.pip_combo.set(provider_name if provider_name in ["清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"] else "不修改 / Keep current")
-        self.snap_combo.set(provider_name if provider_name in ["清华源 / Tsinghua", "中科大源 / USTC"] else "不修改 / Keep current")
-        self.yarn_combo.set("淘宝源 / Taobao" if "淘宝" in provider_name else "不修改 / Keep current")
-        
-        self.log(f"已选择: {provider_name}")
+        apt_combo.set(provider_name if provider_name in ["清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"] else "不修改 / Keep current")
+        npm_combo.set("淘宝源 / Taobao" if "淘宝" in provider_name else "不修改 / Keep current")
+        pip_combo.set(provider_name if provider_name in ["清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"] else "不修改 / Keep current")
+        snap_combo.set(provider_name if provider_name in ["清华源 / Tsinghua", "中科大源 / USTC"] else "不修改 / Keep current")
+        yarn_combo.set("淘宝源 / Taobao" if "淘宝" in provider_name else "不修改 / Keep current")
+        log_text.insert(tk.END, f"已选择: {provider_name}\n")
+        log_text.see(tk.END)
     
-    def apply_config(self):
-        """Apply mirror configuration / 应用镜像配置"""
+    ttk.Button(quick_frame, text="全部使用清华源", command=lambda: quick_config("清华源 / Tsinghua")).grid(row=0, column=0, padx=(0, 5))
+    ttk.Button(quick_frame, text="全部使用阿里源", command=lambda: quick_config("阿里源 / Aliyun")).grid(row=0, column=1, padx=(0, 5))
+    ttk.Button(quick_frame, text="全部使用中科大", command=lambda: quick_config("中科大源 / USTC")).grid(row=0, column=2)
+    
+    # 应用配置按钮
+    def apply_config():
         # 获取用户选择
-        apt_choice = self.apt_combo.get()
-        npm_choice = self.npm_combo.get()
-        pip_choice = self.pip_combo.get()
-        snap_choice = self.snap_combo.get()
-        yarn_choice = self.yarn_combo.get()
+        apt_choice = apt_combo.get()
+        npm_choice = npm_combo.get()
+        pip_choice = pip_combo.get()
+        snap_choice = snap_combo.get()
+        yarn_choice = yarn_combo.get()
         
         # 检查是否有选择任何配置
         if all(choice == "不修改 / Keep current" for choice in [apt_choice, npm_choice, pip_choice, snap_choice, yarn_choice]):
@@ -387,31 +361,41 @@ class MirrorSettingsDialog:
         
         # 确认对话框
         if messagebox.askyesno("确认", "将备份当前配置并应用新镜像源。\nThis will backup current config and apply new mirrors.\n\n继续？/Continue?"):
-            self.log("开始配置... / Configuring...")
+            log_text.insert(tk.END, "开始配置... / Configuring...\n")
             # 这里应该实际应用配置，但为了简单先只显示日志
-            self.log("配置完成 / Configuration completed")
-            self.refresh_status()
+            log_text.insert(tk.END, "配置完成 / Configuration completed\n")
+            log_text.see(tk.END)
+            refresh_status()
     
-    def log(self, message):
-        """Add log message / 添加日志消息"""
-        self.log_text.insert(tk.END, f"{message}\n")
-        self.log_text.see(tk.END)
+    apply_btn = ttk.Button(main_frame, text="应用配置 / Apply Config", command=apply_config)
+    apply_btn.grid(row=2, column=0, pady=10)
     
-    def show(self):
-        """Show the dialog / 显示对话框"""
-        self.root.transient(self.parent)
-        self.root.grab_set()
-        self.root.wait_window()
-
-
-def show_mirror_settings(parent=None):
-    """Show mirror settings dialog / 显示镜像设置对话框"""
-    dialog = MirrorSettingsDialog(parent)
-    dialog.show()
+    # 日志区域
+    log_frame = ttk.LabelFrame(main_frame, text="操作日志 / Operation Log", padding="10")
+    log_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0))
+    log_frame.columnconfigure(0, weight=1)
+    log_frame.rowconfigure(0, weight=1)
+    
+    log_text = scrolledtext.ScrolledText(log_frame, height=8, width=70)
+    log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+    
+    # 刷新初始状态
+    refresh_status()
+    
+    # 设置窗口关闭行为
+    def on_closing():
+        root.destroy()
+    
+    root.protocol("WM_DELETE_WINDOW", on_closing)
+    
+    # 如果是模态对话框，启用并等待
+    if parent:
+        root.transient(parent)
+        root.grab_set()
+    
+    root.mainloop() if parent is None else root.wait_window()
 
 
 if __name__ == "__main__":
     # 测试用
-    root = tk.Tk()
-    root.withdraw()  # 隐藏主窗口
     show_mirror_settings()
