@@ -307,6 +307,7 @@ class MirrorSettingsDialog(QDialog):
             "═══ 当前镜像源 / Current Mirrors ═══",
             f"   APT:   {info['apt']}",
             f"   NPM:   {info['npm']}",
+            f"   Yarn:  {info['yarn']}",
             f"   Pip:   {info['pip']}",
             f"   Snap:  {info['snap']}",
         ]
