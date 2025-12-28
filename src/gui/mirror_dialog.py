@@ -30,8 +30,8 @@ class MirrorSettingsDialog(QDialog):
     def _init_ui(self) -> None:
         """Initialize UI / 初始化界面"""
         self.setWindowTitle("镜像源管理 / Mirror Settings")
-        self.setMinimumSize(550, 500)
-        self.resize(600, 550)
+        self.setMinimumSize(600, 600)
+        self.resize(650, 700)
         
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
@@ -65,7 +65,7 @@ class MirrorSettingsDialog(QDialog):
         
         self.status_text = QTextEdit()
         self.status_text.setReadOnly(True)
-        self.status_text.setMinimumHeight(80)
+        self.status_text.setMinimumHeight(140)
         self.status_text.setStyleSheet("""
             QTextEdit {
                 background-color: #1e1e1e;
@@ -73,7 +73,8 @@ class MirrorSettingsDialog(QDialog):
                 border: 1px solid #444;
                 border-radius: 3px;
                 font-family: Consolas, Monaco, monospace;
-                font-size: 12px;
+                font-size: 13px;
+                line-height: 1.5;
             }
         """)
         status_layout.addWidget(self.status_text)
@@ -272,11 +273,14 @@ class MirrorSettingsDialog(QDialog):
         distro, release = self.mirror_manager.detect_distro()
         
         status_lines = [
-            f"系统 / System: {distro.value} {release}",
-            f"APT 源 / APT: {info['apt']}",
-            f"NPM 源 / NPM: {info['npm']}",
-            f"Pip 源 / Pip: {info['pip']}",
-            f"Snap 源 / Snap: {info['snap']}",
+            "═══ 系统信息 / System Info ═══",
+            f"   发行版 / Distro:  {distro.value.upper()} {release}",
+            "",
+            "═══ 当前镜像源 / Current Mirrors ═══",
+            f"   APT:   {info['apt']}",
+            f"   NPM:   {info['npm']}",
+            f"   Pip:   {info['pip']}",
+            f"   Snap:  {info['snap']}",
         ]
         self.status_text.setText("\n".join(status_lines))
     
