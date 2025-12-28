@@ -12,7 +12,7 @@ from PyQt6.QtGui import QFont, QCloseEvent
 from PyQt6.QtCore import Qt, QTimer
 
 from .tray_icon import TrayIcon
-from .mirror_dialog import MirrorSettingsDialog
+from .mirror_dialog import show_mirror_settings
 from ..core.detector import detect_proxy_settings, clean_all_proxy, get_cleaner
 from ..core.cleaner_base import CleanReport, DetectResult, CleanStatus
 from ..utils.config import config
@@ -248,8 +248,7 @@ class MainWindow(QMainWindow):
     def _open_mirror_settings(self) -> None:
         """打开镜像源设置对话框 / Open mirror settings dialog"""
         try:
-            dialog = MirrorSettingsDialog(self)
-            dialog.exec()
+            show_mirror_settings(self)
         except Exception as e:
             QMessageBox.critical(self, "错误 / Error", f"打开镜像源管理器失败:\nFailed to open mirror manager:\n{str(e)}")
             logger.error(f"Failed to open mirror settings: {e}")
