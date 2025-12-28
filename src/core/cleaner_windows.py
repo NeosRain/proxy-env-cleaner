@@ -11,6 +11,7 @@ from .cleaner_base import (
     BaseCleaner, CleanResult, CleanStatus, DetectResult, CleanReport
 )
 from ..utils.logger import logger
+from ..utils.subprocess_utils import run_hidden
 
 
 class WindowsCleaner(BaseCleaner):
@@ -115,7 +116,7 @@ class WindowsCleaner(BaseCleaner):
     def _detect_git_proxy(self) -> DetectResult:
         """Detect Git proxy / 检测 Git 代理"""
         try:
-            result = subprocess.run(
+            result = run_hidden(
                 ["git", "config", "--global", "--get", "http.proxy"],
                 capture_output=True, text=True, timeout=5
             )
@@ -251,13 +252,13 @@ class WindowsCleaner(BaseCleaner):
         """Clean Git proxy settings / 清理 Git 代理设置"""
         try:
             # Remove http.proxy / 删除 http.proxy
-            subprocess.run(
+            run_hidden(
                 ["git", "config", "--global", "--unset", "http.proxy"],
                 capture_output=True, timeout=5
             )
             
             # Remove https.proxy / 删除 https.proxy
-            subprocess.run(
+            run_hidden(
                 ["git", "config", "--global", "--unset", "https.proxy"],
                 capture_output=True, timeout=5
             )
@@ -343,7 +344,7 @@ class WindowsCleaner(BaseCleaner):
     def _detect_uwp_loopback(self) -> DetectResult:
         """检测 UWP 回环设置 / Detect UWP loopback settings"""
         try:
-            result = subprocess.run(
+            result = run_hidden(
                 ["CheckNetIsolation", "LoopbackExempt", "-s"],
                 capture_output=True, text=True, timeout=10
             )
@@ -375,8 +376,8 @@ class WindowsCleaner(BaseCleaner):
         
         # Clean npm config
         try:
-            subprocess.run(["npm", "config", "delete", "proxy"], capture_output=True, timeout=5)
-            subprocess.run(["npm", "config", "delete", "https-proxy"], capture_output=True, timeout=5)
+            run_hidden(["npm", "config", "delete", "proxy"], capture_output=True, timeout=5)
+            run_hidden(["npm", "config", "delete", "https-proxy"], capture_output=True, timeout=5)
             cleaned.append("npm")
         except Exception:
             pass
@@ -451,7 +452,7 @@ class WindowsCleaner(BaseCleaner):
     def flush_dns_cache(self) -> CleanResult:
         """刷新 DNS 缓存 / Flush DNS cache"""
         try:
-            result = subprocess.run(
+            result = run_hidden(
                 ["ipconfig", "/flushdns"],
                 capture_output=True, text=True, timeout=10
             )
@@ -477,7 +478,7 @@ class WindowsCleaner(BaseCleaner):
         """重置 Winsock 目录 / Reset Winsock catalog"""
         try:
             # Note: This requires admin privileges / 注意：需要管理员权限
-            result = subprocess.run(
+            result = run_hidden(
                 ["netsh", "winsock", "reset"],
                 capture_output=True, text=True, timeout=15
             )

@@ -34,8 +34,8 @@ class MainWindow(QMainWindow):
     def _init_ui(self) -> None:
         """Initialize UI / 初始化界面"""
         self.setWindowTitle("代理环境清理工具 / Proxy Env Cleaner")
-        self.setMinimumSize(600, 500)
-        self.resize(700, 600)
+        self.setMinimumSize(550, 450)
+        self.resize(600, 480)
         
         # Central widget / 中央控件
         central_widget = QWidget()
@@ -61,7 +61,7 @@ class MainWindow(QMainWindow):
         
         self.status_text = QTextEdit()
         self.status_text.setReadOnly(True)
-        self.status_text.setMaximumHeight(150)
+        self.status_text.setMaximumHeight(120)
         self.status_text.setStyleSheet("""
             QTextEdit {
                 background-color: #f5f5f5;
@@ -75,6 +75,24 @@ class MainWindow(QMainWindow):
         
         # Refresh button / 刷新按钮
         refresh_btn = QPushButton("刷新状态 / Refresh Status")
+        refresh_btn.setStyleSheet("""
+            QPushButton {
+                padding: 6px 15px;
+                background-color: #95a5a6;
+                color: white;
+                border: none;
+                border-radius: 3px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #7f8c8d;
+            }
+            QPushButton:pressed {
+                background-color: #5d6d7e;
+                padding-top: 8px;
+                padding-bottom: 4px;
+            }
+        """)
         refresh_btn.clicked.connect(self._refresh_status)
         status_layout.addWidget(refresh_btn)
         
@@ -108,16 +126,18 @@ class MainWindow(QMainWindow):
                 background-color: #3498db;
                 color: white;
                 border: none;
-                padding: 12px 30px;
+                padding: 10px 25px;
                 border-radius: 5px;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: bold;
             }
             QPushButton:hover {
                 background-color: #2980b9;
             }
             QPushButton:pressed {
-                background-color: #21618c;
+                background-color: #1c5985;
+                padding-top: 12px;
+                padding-bottom: 8px;
             }
         """)
         self.clean_btn.clicked.connect(self._on_clean)
@@ -129,16 +149,18 @@ class MainWindow(QMainWindow):
                 background-color: #e74c3c;
                 color: white;
                 border: none;
-                padding: 12px 30px;
+                padding: 10px 25px;
                 border-radius: 5px;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: bold;
             }
             QPushButton:hover {
                 background-color: #c0392b;
             }
             QPushButton:pressed {
-                background-color: #a93226;
+                background-color: #922b21;
+                padding-top: 12px;
+                padding-bottom: 8px;
             }
         """)
         self.clean_exit_btn.clicked.connect(self._on_clean_and_exit)

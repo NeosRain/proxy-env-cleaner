@@ -16,6 +16,12 @@ from .cleaner_base import (
 from ..utils.logger import logger
 from ..utils.config import get_config_dir
 
+# 隐藏 subprocess 窗口的全局配置 / Global config to hide subprocess windows
+if os.name == 'nt':
+    SUBPROCESS_FLAGS = subprocess.CREATE_NO_WINDOW
+else:
+    SUBPROCESS_FLAGS = 0
+
 
 class LinuxCleaner(BaseCleaner):
     """Linux proxy cleaner / Linux 代理清理器"""
