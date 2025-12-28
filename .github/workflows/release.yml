@@ -1,0 +1,204 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Build Windows executable
+      run: |
+        pyinstaller --noconfirm --onefile --windowed --name "ProxyEnvCleaner" --add-data "src;src" --hidden-import "PyQt6.QtWidgets" --hidden-import "PyQt6.QtGui" --hidden-import "PyQt6.QtCore" src/main.py
+    
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ProxyEnvCleaner-Windows
+        path: dist/ProxyEnvCleaner.exe
+  
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-pyqt6 dpkg-dev
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Build Linux binary
+      run: |
+        pyinstaller --noconfirm --onefile --windowed --name "proxy-env-cleaner" --add-data "src:src" --hidden-import "PyQt6.QtWidgets" --hidden-import "PyQt6.QtGui" --hidden-import "PyQt6.QtCore" src/main.py
+    
+    - name: Build DEB package
+      run: |
+        VERSION="${GITHUB_REF#refs/tags/v}"
+        if [ -z "$VERSION" ]; then VERSION="1.0.0"; fi
+        
+        DEB_DIR="build/deb"
+        mkdir -p "$DEB_DIR/DEBIAN"
+        mkdir -p "$DEB_DIR/usr/bin"
+        mkdir -p "$DEB_DIR/usr/share/applications"
+        
+        cp dist/proxy-env-cleaner "$DEB_DIR/usr/bin/"
+        chmod 755 "$DEB_DIR/usr/bin/proxy-env-cleaner"
+        
+        cat > "$DEB_DIR/DEBIAN/control" << EOF
+        Package: proxy-env-cleaner
+        Version: $VERSION
+        Section: utils
+        Priority: optional
+        Architecture: amd64
+        Depends: libxcb-cursor0
+        Maintainer: ProxyEnvCleaner <dev@proxyenvcleaner.org>
+        Description: Proxy Environment Cleaner
+         A tool to automatically clean all proxy environment settings on startup.
+         开机自动清理所有代理环境设置的工具。
+        EOF
+        
+        cat > "$DEB_DIR/DEBIAN/postinst" << 'EOF'
+        #!/bin/bash
+        set -e
+        AUTOSTART_DIR="/etc/xdg/autostart"
+        mkdir -p "$AUTOSTART_DIR"
+        cat > "$AUTOSTART_DIR/proxy-env-cleaner.desktop" << DESKTOP
+        [Desktop Entry]
+        Type=Application
+        Name=Proxy Env Cleaner
+        Name[zh_CN]=代理环境清理工具
+        Comment=Clean proxy environment settings
+        Comment[zh_CN]=清理代理环境设置
+        Exec=/usr/bin/proxy-env-cleaner
+        Terminal=false
+        Categories=Utility;
+        StartupNotify=false
+        X-GNOME-Autostart-enabled=true
+        DESKTOP
+        echo "Proxy Env Cleaner installed / 代理环境清理工具已安装"
+        EOF
+        chmod 755 "$DEB_DIR/DEBIAN/postinst"
+        
+        cat > "$DEB_DIR/DEBIAN/prerm" << 'EOF'
+        #!/bin/bash
+        set -e
+        rm -f /etc/xdg/autostart/proxy-env-cleaner.desktop
+        echo "Proxy Env Cleaner removed / 代理环境清理工具已卸载"
+        EOF
+        chmod 755 "$DEB_DIR/DEBIAN/prerm"
+        
+        cat > "$DEB_DIR/usr/share/applications/proxy-env-cleaner.desktop" << EOF
+        [Desktop Entry]
+        Type=Application
+        Name=Proxy Env Cleaner
+        Name[zh_CN]=代理环境清理工具
+        Comment=Clean proxy environment settings
+        Comment[zh_CN]=清理代理环境设置
+        Exec=/usr/bin/proxy-env-cleaner
+        Terminal=false
+        Categories=Utility;System;
+        Keywords=proxy;clean;network;
+        EOF
+        
+        dpkg-deb --build "$DEB_DIR" "dist/proxy-env-cleaner_${VERSION}_amd64.deb"
+    
+    - name: Upload Linux binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: ProxyEnvCleaner-Linux-Binary
+        path: dist/proxy-env-cleaner
+    
+    - name: Upload DEB package
+      uses: actions/upload-artifact@v4
+      with:
+        name: ProxyEnvCleaner-Linux-DEB
+        path: dist/*.deb
+  
+  release:
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download Windows artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ProxyEnvCleaner-Windows
+        path: release/windows
+    
+    - name: Download Linux binary
+      uses: actions/download-artifact@v4
+      with:
+        name: ProxyEnvCleaner-Linux-Binary
+        path: release/linux
+    
+    - name: Download DEB package
+      uses: actions/download-artifact@v4
+      with:
+        name: ProxyEnvCleaner-Linux-DEB
+        path: release/deb
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release/windows/ProxyEnvCleaner.exe
+          release/linux/proxy-env-cleaner
+          release/deb/*.deb
+        body: |
+          ## 代理环境清理工具 / Proxy Environment Cleaner
+          
+          ### 新功能 / New Features
+          - ✅ 自动清理所有代理设置（系统、环境变量、Git、NPM、Pip等）
+          - ✅ 开机自启动自动清理
+          - ✅ 系统托盘常驻，支持一键清理
+          - ✅ Linux 软件源自动备份（最多5个）
+          - ✅ 双语界面支持（中文/英文）
+          
+          ### 下载说明 / Download
+          
+          **Windows 用户:**
+          - 下载 `ProxyEnvCleaner.exe` 直接运行
+          
+          **Linux 用户:**
+          - Ubuntu/Debian: 下载 `.deb` 文件，执行 `sudo dpkg -i proxy-env-cleaner_*.deb`
+          - 其他发行版: 下载 `proxy-env-cleaner` 二进制文件，赋予执行权限后运行
+          
+          ### 使用方法 / Usage
+          1. 运行程序后会最小化到系统托盘
+          2. 右键托盘图标选择"一键清理"
+          3. 或选择"清理后退出"完成清理并关闭程序
+          
+          完整功能请查看 [README.md](https://github.com/${{ github.repository }}/blob/main/README.md)
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
