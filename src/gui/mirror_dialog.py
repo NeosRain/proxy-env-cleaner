@@ -165,6 +165,17 @@ class MirrorSettingsDialog(QDialog):
         snap_layout.addWidget(self.snap_combo, 1)
         select_layout.addLayout(snap_layout)
         
+        # Yarn Mirror
+        yarn_layout = QHBoxLayout()
+        yarn_label = QLabel("Yarn 源:")
+        yarn_label.setMinimumWidth(80)
+        self.yarn_combo = QComboBox()
+        self.yarn_combo.addItem("不修改 / Keep current", None)
+        self.yarn_combo.addItem("淘宝源 (npmmirror)", MirrorProvider.TSINGHUA)
+        yarn_layout.addWidget(yarn_label)
+        yarn_layout.addWidget(self.yarn_combo, 1)
+        select_layout.addLayout(yarn_layout)
+        
         layout.addWidget(select_group)
         
         # Quick config buttons / 快速配置按钮
@@ -330,6 +341,12 @@ class MirrorSettingsDialog(QDialog):
             self.snap_combo.setCurrentIndex(snap_index)
         else:
             self.snap_combo.setCurrentIndex(0)  # 不修改
+        # Yarn 支持所有源
+        yarn_index = self.yarn_combo.findData(provider)
+        if yarn_index >= 0:
+            self.yarn_combo.setCurrentIndex(yarn_index)
+        else:
+            self.yarn_combo.setCurrentIndex(0)  # 不修改
         self._log(f"已选择: {MIRROR_PROVIDERS[provider].name_zh}")
         self._log(f"Selected: {MIRROR_PROVIDERS[provider].name}")
     
@@ -339,8 +356,9 @@ class MirrorSettingsDialog(QDialog):
         npm_provider = self.npm_combo.currentData()
         pip_provider = self.pip_combo.currentData()
         snap_provider = self.snap_combo.currentData()
+        yarn_provider = self.yarn_combo.currentData()
         
-        if not any([apt_provider, npm_provider, pip_provider, snap_provider]):
+        if not any([apt_provider, npm_provider, pip_provider, snap_provider, yarn_provider]):
             self._log("未选择任何镜像源 / No mirror selected")
             return
         
@@ -363,7 +381,8 @@ class MirrorSettingsDialog(QDialog):
             apt_provider=apt_provider,
             npm_provider=npm_provider,
             pip_provider=pip_provider,
-            snap_provider=snap_provider
+            snap_provider=snap_provider,
+            yarn_provider=yarn_provider
         )
         
         for key, success in results.items():

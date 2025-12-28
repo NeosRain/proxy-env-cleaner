@@ -640,12 +640,67 @@ trusted-host = {config.pip_trusted_host}
             logger.error(f"Failed to configure Snap mirror: {e}")
             return False
     
+    def configure_yarn_mirror(self, provider: MirrorProvider) -> bool:
+        """配置 Yarn 镜像源 / Configure Yarn mirror"""
+        if provider not in MIRROR_PROVIDERS:
+            return False
+        
+        config = MIRROR_PROVIDERS[provider]
+        creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+        
+        # 检查是否已经是目标镜像源
+        try:
+            result = subprocess.run(
+                ["yarn", "config", "get", "registry"],
+                capture_output=True, text=True, timeout=10,
+                creationflags=creationflags
+            )
+            if result.returncode == 0:
+                current = result.stdout.strip()
+                if config.npm_registry in current:
+                    logger.info(f"Yarn 已经是 {config.name} 镜像 / Yarn already using {config.name}")
+                    return True
+        except Exception:
+            pass
+        
+        success = False
+        
+        # 方法 1: 使用命令行设置
+        try:
+            result = subprocess.run(
+                ["yarn", "config", "set", "registry", config.npm_registry],
+                capture_output=True, text=True, timeout=15,
+                creationflags=creationflags
+            )
+            if result.returncode == 0:
+                success = True
+                logger.info(f"Yarn mirror set via command: {config.npm_registry}")
+        except Exception as e:
+            logger.warning(f"yarn config set failed: {e}")
+        
+        # 验证配置是否成功
+        if success:
+            try:
+                result = subprocess.run(
+                    ["yarn", "config", "get", "registry"],
+                    capture_output=True, text=True, timeout=10,
+                    creationflags=creationflags
+                )
+                if result.returncode == 0 and config.npm_registry in result.stdout:
+                    logger.info("✅ Yarn 镜像配置验证成功 / Yarn mirror verified")
+                    return True
+            except Exception:
+                pass
+        
+        return success
+
     def configure_all_mirrors(self, 
                               apt_provider: Optional[MirrorProvider] = None,
                               npm_provider: Optional[MirrorProvider] = None,
                               pip_provider: Optional[MirrorProvider] = None,
-                              snap_provider: Optional[MirrorProvider] = None) -> Dict[str, bool]:
-        """Configure all mirrors / 配置所有镜像源"""
+                              snap_provider: Optional[MirrorProvider] = None,
+                              yarn_provider: Optional[MirrorProvider] = None) -> Dict[str, bool]:
+        """配置所有镜像源 / Configure all mirrors"""
         results = {}
         
         # Backup first / 先备份
@@ -667,6 +722,10 @@ trusted-host = {config.pip_trusted_host}
         # Configure Snap
         if snap_provider:
             results["snap"] = self.configure_snap_mirror(snap_provider)
+        
+        # Configure Yarn
+        if yarn_provider:
+            results["yarn"] = self.configure_yarn_mirror(yarn_provider)
         
         return results
 
