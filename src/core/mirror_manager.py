@@ -604,8 +604,6 @@ class MirrorManager:
         except Exception as e:
             logger.error(f"Failed to configure APT mirror: {e}")
             return False
-        
-        return False
     
     def configure_npm_mirror(self, provider: MirrorProvider) -> bool:
         """Configure NPM mirror / 配置 NPM 镜像源"""

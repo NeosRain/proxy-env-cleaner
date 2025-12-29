@@ -46,3 +46,20 @@ include = ["src*"]
 name = "ClashEnvCleaner"
 onefile = true
 windowed = true
+
+[tool.black]
+line-length = 88
+skip-string-normalization = true
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = [
+    "E203",  # whitespace before ':' - not compliant with Black
+    "W503",  # line break before binary operator
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+

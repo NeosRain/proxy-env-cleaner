@@ -15,7 +15,8 @@ def get_app_path() -> str:
         return sys.executable
     else:
         # Running as script / 作为脚本运行
-        return sys.executable + ' "' + str(Path(__file__).parent.parent / "main.py") + '"'
+        main_py = str(Path(__file__).parent.parent / "main.py")
+        return f'{sys.executable} "{main_py}"'
 
 
 def enable_autostart() -> bool:

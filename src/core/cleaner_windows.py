@@ -166,7 +166,10 @@ class WindowsCleaner(BaseCleaner):
             winreg.CloseKey(key)
             
             # Notify system of changes / 通知系统设置已更改
-            self._refresh_internet_settings()
+            try:
+                self._refresh_internet_settings()
+            except Exception as e:
+                logger.warning(f"Failed to refresh internet settings: {e}")
             
             logger.info("System proxy cleaned successfully")
             return CleanResult(

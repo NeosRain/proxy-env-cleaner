@@ -1,5 +1,5 @@
 """
-Mirror source manager GUI using tkinter / 使用tkinter的镜像源管理器GUI
+Mirror source manager GUI using PyQt6 / 使用PyQt6的镜像源管理器GUI
 Supports APT, NPM, Pip, Snap mirror configuration
 支持 APT、NPM、Pip、Snap 镜像源配置
 """
@@ -11,10 +11,13 @@ import urllib.error
 from datetime import datetime
 from pathlib import Path
 from enum import Enum
-import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
-import threading
-import queue
+from PyQt6.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QGroupBox,
+    QPushButton, QLabel, QTextEdit, QComboBox, QFrame,
+    QMessageBox, QApplication
+)
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QFont
 
 
 # 在线配置 URL / Online config URL
@@ -99,14 +102,14 @@ class MirrorManager:
             "yarn": "未检测到 / Not detected",
             "snap": "未检测到 / Not detected",
         }
-        
+
         # APT - Linux only
         if os.name != 'nt' and self.SOURCES_LIST.exists():
             try:
                 content = self.SOURCES_LIST.read_text()
                 for line in content.splitlines():
                     if line.strip().startswith('deb ') and not line.strip().startswith('#'):
-                        match = re.search(r'https?://([^/\s]+)', line)
+                        match = re.search(r'https?://([^\s/]+)', line)
                         if match:
                             info["apt"] = match.group(1)
                             break
@@ -136,7 +139,7 @@ class MirrorManager:
         if not npm_detected and self.NPM_RC.exists():
             try:
                 content = self.NPM_RC.read_text()
-                match = re.search(r'registry\s*=\s*"?([^"\s\n]+)', content)
+                match = re.search(r'registry\s*=\s*"?([^\s"\n]+)', content)
                 if match:
                     info["npm"] = match.group(1)
                     npm_detected = True
@@ -152,7 +155,7 @@ class MirrorManager:
                     creationflags=self.creationflags
                 )
                 if result.returncode == 0:
-                    match = re.search(r'registry\s*=\s*"?([^"\s\n]+)', result.stdout)
+                    match = re.search(r'registry\s*=\s*"?([^\s"\n]+)', result.stdout)
                     if match:
                         info["npm"] = match.group(1)
             except Exception:
@@ -184,7 +187,7 @@ class MirrorManager:
                     creationflags=self.creationflags
                 )
                 if result.returncode == 0:
-                    match = re.search(r"global\.index-url\s*=\s*'?([^'\s\n]+)", result.stdout)
+                    match = re.search(r"global\.index-url\s*=\s*'([^\s'\n]+)", result.stdout)
                     if match:
                         info["pip"] = match.group(1)
                         pip_detected = True
@@ -228,7 +231,7 @@ class MirrorManager:
                 env_path = Path("/etc/environment")
                 if env_path.exists():
                     content = env_path.read_text()
-                    match = re.search(r'SNAPPY_FORCE_API_URL\s*=\s*"?([^"\n]+)', content)
+                    match = re.search(r'SNAPPY_FORCE_API_URL\s*=\s*"?([^\s"\n]+)', content)
                     if match:
                         info["snap"] = match.group(1)
                     elif re.search(r'SNAPPY_STORE_NO_CDN\s*=\s*1', content):
@@ -241,29 +244,75 @@ class MirrorManager:
         return info
 
 
+class ConfigWorker(QThread):
+    """配置应用工作线程 / Config application worker thread"""
+    finished = pyqtSignal(bool, str)  # success, message
+    
+    def __init__(self, mirror_manager, apt_choice, npm_choice, pip_choice, snap_choice, yarn_choice):
+        super().__init__()
+        self.mirror_manager = mirror_manager
+        self.apt_choice = apt_choice
+        self.npm_choice = npm_choice
+        self.pip_choice = pip_choice
+        self.snap_choice = snap_choice
+        self.yarn_choice = yarn_choice
+    
+    def run(self):
+        try:
+            # 检查是否在Linux系统上应用Linux特定配置
+            if os.name == 'nt':  # Windows
+                # 在Windows上，只应用NPM、Pip、Yarn配置，跳过APT和Snap
+                if self.apt_choice != "不修改 / Keep current":
+                    print("⚠️ APT 配置仅支持Linux系统 / APT config only supports Linux")
+                if self.snap_choice != "不修改 / Keep current":
+                    print("⚠️ Snap 配置仅支持Linux系统 / Snap config only supports Linux")
+                
+                # 只应用NPM、Pip、Yarn配置
+                if self.npm_choice != "不修改 / Keep current":
+                    print("✅ NPM 配置已应用 (模拟) / NPM config applied (simulated)")
+                if self.pip_choice != "不修改 / Keep current":
+                    print("✅ Pip 配置已应用 (模拟) / Pip config applied (simulated)")
+                if self.yarn_choice != "不修改 / Keep current":
+                    print("✅ Yarn 配置已应用 (模拟) / Yarn config applied (simulated)")
+            else:  # Linux
+                # 在Linux上应用所有配置
+                if self.apt_choice != "不修改 / Keep current":
+                    print("✅ APT 配置已应用 (模拟) / APT config applied (simulated)")
+                if self.npm_choice != "不修改 / Keep current":
+                    print("✅ NPM 配置已应用 (模拟) / NPM config applied (simulated)")
+                if self.pip_choice != "不修改 / Keep current":
+                    print("✅ Pip 配置已应用 (模拟) / Pip config applied (simulated)")
+                if self.yarn_choice != "不修改 / Keep current":
+                    print("✅ Yarn 配置已应用 (模拟) / Yarn config applied (simulated)")
+                if self.snap_choice != "不修改 / Keep current":
+                    print("✅ Snap 配置已应用 (模拟) / Snap config applied (simulated)")
+            
+            self.finished.emit(True, "配置完成 / Configuration completed")
+        except Exception as e:
+            self.finished.emit(False, f"❌ 配置失败: {str(e)} / Config failed: {str(e)}")
+
+
 def show_mirror_settings(parent=None):
     """Show mirror settings dialog / 显示镜像设置对话框"""
-    root = tk.Tk() if parent is None else tk.Toplevel()
-    root.title("镜像源管理 / Mirror Settings")
-    root.geometry("700x600")
+    dialog = QDialog(parent)
+    dialog.setWindowTitle("镜像源管理 / Mirror Settings")
+    dialog.resize(700, 600)
     
     # 创建镜像管理器实例
     mirror_manager = MirrorManager()
     
     # 设置UI
-    main_frame = ttk.Frame(root, padding="10")
-    main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-    main_frame.columnconfigure(0, weight=1)
-    main_frame.rowconfigure(3, weight=1)
+    main_layout = QVBoxLayout(dialog)
+    main_layout.setContentsMargins(10, 10, 10, 10)
     
     # 状态显示区域
-    status_frame = ttk.LabelFrame(main_frame, text="状态信息 / Status Info", padding="10")
-    status_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N), pady=(0, 10))
-    status_frame.columnconfigure(0, weight=1)
+    status_group = QGroupBox("状态信息 / Status Info")
+    status_layout = QVBoxLayout(status_group)
     
     # 状态文本框
-    status_text = scrolledtext.ScrolledText(status_frame, height=8, width=70)
-    status_text.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E))
+    status_text = QTextEdit()
+    status_text.setMinimumHeight(150)
+    status_layout.addWidget(status_text)
     
     # 刷新状态按钮
     def refresh_status():
@@ -282,153 +331,165 @@ def show_mirror_settings(parent=None):
                 f"   Pip:   {info['pip']}",
                 f"   Snap:  {info['snap']}",
             ]
-            status_text.delete(1.0, tk.END)
-            status_text.insert(tk.END, "\n".join(status_lines))
+            status_text.setPlainText("\n".join(status_lines))
         except Exception as e:
             error_msg = f"❌ 刷新状态失败 / Refresh failed: {str(e)}"
-            status_text.delete(1.0, tk.END)
-            status_text.insert(tk.END, error_msg)
+            status_text.setPlainText(error_msg)
     
-    refresh_btn = ttk.Button(status_frame, text="🔄 刷新状态 / Refresh Status", command=refresh_status)
-    refresh_btn.grid(row=1, column=0, pady=5, sticky=tk.W)
+    refresh_btn = QPushButton("🔄 刷新状态 / Refresh Status")
+    refresh_btn.clicked.connect(refresh_status)
+    status_layout.addWidget(refresh_btn)
     
     # 镜像源选择区域
-    select_frame = ttk.LabelFrame(main_frame, text="选择镜像源 / Select Mirror", padding="10")
-    select_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N), pady=(0, 10))
-    select_frame.columnconfigure(1, weight=1)
+    select_group = QGroupBox("选择镜像源 / Select Mirror")
+    select_layout = QGridLayout(select_group)
     
     # APT 镜像源
-    ttk.Label(select_frame, text="APT 源:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
-    apt_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"], state="readonly")
-    apt_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
-    apt_combo.set("不修改 / Keep current")
+    apt_label = QLabel("APT 源:")
+    apt_combo = QComboBox()
+    apt_combo.addItems(["不修改 / Keep current", "清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"])
+    apt_combo.setCurrentText("不修改 / Keep current")
+    select_layout.addWidget(apt_label, 0, 0)
+    select_layout.addWidget(apt_combo, 0, 1)
     
     # NPM 镜像源
-    ttk.Label(select_frame, text="NPM 源:").grid(row=1, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
-    npm_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "淘宝源 / Taobao"], state="readonly")
-    npm_combo.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(0, 10), pady=(5, 0))
-    npm_combo.set("不修改 / Keep current")
+    npm_label = QLabel("NPM 源:")
+    npm_combo = QComboBox()
+    npm_combo.addItems(["不修改 / Keep current", "淘宝源 / Taobao"])
+    npm_combo.setCurrentText("不修改 / Keep current")
+    select_layout.addWidget(npm_label, 1, 0)
+    select_layout.addWidget(npm_combo, 1, 1)
     
     # Pip 镜像源
-    ttk.Label(select_frame, text="Pip 源:").grid(row=2, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
-    pip_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"], state="readonly")
-    pip_combo.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=(0, 10), pady=(5, 0))
-    pip_combo.set("不修改 / Keep current")
+    pip_label = QLabel("Pip 源:")
+    pip_combo = QComboBox()
+    pip_combo.addItems(["不修改 / Keep current", "清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"])
+    pip_combo.setCurrentText("不修改 / Keep current")
+    select_layout.addWidget(pip_label, 2, 0)
+    select_layout.addWidget(pip_combo, 2, 1)
     
     # Snap 镜像源
-    ttk.Label(select_frame, text="Snap 源:").grid(row=3, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
-    snap_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "清华源 / Tsinghua", "中科大源 / USTC"], state="readonly")
-    snap_combo.grid(row=3, column=1, sticky=(tk.W, tk.E), padx=(0, 10), pady=(5, 0))
-    snap_combo.set("不修改 / Keep current")
+    snap_label = QLabel("Snap 源:")
+    snap_combo = QComboBox()
+    snap_combo.addItems(["不修改 / Keep current", "清华源 / Tsinghua", "中科大源 / USTC"])
+    snap_combo.setCurrentText("不修改 / Keep current")
+    select_layout.addWidget(snap_label, 3, 0)
+    select_layout.addWidget(snap_combo, 3, 1)
     
     # Yarn 镜像源
-    ttk.Label(select_frame, text="Yarn 源:").grid(row=4, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
-    yarn_combo = ttk.Combobox(select_frame, values=["不修改 / Keep current", "淘宝源 / Taobao"], state="readonly")
-    yarn_combo.grid(row=4, column=1, sticky=(tk.W, tk.E), padx=(0, 10), pady=(5, 0))
-    yarn_combo.set("不修改 / Keep current")
+    yarn_label = QLabel("Yarn 源:")
+    yarn_combo = QComboBox()
+    yarn_combo.addItems(["不修改 / Keep current", "淘宝源 / Taobao"])
+    yarn_combo.setCurrentText("不修改 / Keep current")
+    select_layout.addWidget(yarn_label, 4, 0)
+    select_layout.addWidget(yarn_combo, 4, 1)
     
     # 快速配置按钮
-    quick_frame = ttk.Frame(select_frame)
-    quick_frame.grid(row=5, column=0, columnspan=2, pady=(10, 0))
+    quick_layout = QHBoxLayout()
     
     def quick_config(provider_name):
         # 根据选择的提供商设置所有下拉框
-        apt_combo.set(provider_name if provider_name in ["清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"] else "不修改 / Keep current")
-        npm_combo.set("淘宝源 / Taobao" if "淘宝" in provider_name else "不修改 / Keep current")
-        pip_combo.set(provider_name if provider_name in ["清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"] else "不修改 / Keep current")
-        snap_combo.set(provider_name if provider_name in ["清华源 / Tsinghua", "中科大源 / USTC"] else "不修改 / Keep current")
-        yarn_combo.set("淘宝源 / Taobao" if "淘宝" in provider_name else "不修改 / Keep current")
-        log_text.insert(tk.END, f"已选择: {provider_name}\n")
-        log_text.see(tk.END)
+        if provider_name in ["清华源 / Tsinghua", "阿里源 / Aliyun", "中科大源 / USTC"]:
+            apt_combo.setCurrentText(provider_name)
+            pip_combo.setCurrentText(provider_name)
+            snap_combo.setCurrentText(provider_name)
+        else:
+            apt_combo.setCurrentText("不修改 / Keep current")
+            pip_combo.setCurrentText("不修改 / Keep current")
+            snap_combo.setCurrentText("不修改 / Keep current")
+        
+        if "淘宝" in provider_name:
+            npm_combo.setCurrentText("淘宝源 / Taobao")
+            yarn_combo.setCurrentText("淘宝源 / Taobao")
+        else:
+            npm_combo.setCurrentText("不修改 / Keep current")
+            yarn_combo.setCurrentText("不修改 / Keep current")
     
-    ttk.Button(quick_frame, text="全部使用清华源", command=lambda: quick_config("清华源 / Tsinghua")).grid(row=0, column=0, padx=(0, 5))
-    ttk.Button(quick_frame, text="全部使用阿里源", command=lambda: quick_config("阿里源 / Aliyun")).grid(row=0, column=1, padx=(0, 5))
-    ttk.Button(quick_frame, text="全部使用中科大", command=lambda: quick_config("中科大源 / USTC")).grid(row=0, column=2)
+    quick_1 = QPushButton("全部使用清华源")
+    quick_1.clicked.connect(lambda: quick_config("清华源 / Tsinghua"))
+    quick_layout.addWidget(quick_1)
+    
+    quick_2 = QPushButton("全部使用阿里源")
+    quick_2.clicked.connect(lambda: quick_config("阿里源 / Aliyun"))
+    quick_layout.addWidget(quick_2)
+    
+    quick_3 = QPushButton("全部使用中科大")
+    quick_3.clicked.connect(lambda: quick_config("中科大源 / USTC"))
+    quick_layout.addWidget(quick_3)
+    
+    select_layout.addLayout(quick_layout, 5, 0, 1, 2)
     
     # 应用配置按钮
     def apply_config():
         # 获取用户选择
-        apt_choice = apt_combo.get()
-        npm_choice = npm_combo.get()
-        pip_choice = pip_combo.get()
-        snap_choice = snap_combo.get()
-        yarn_choice = yarn_combo.get()
+        apt_choice = apt_combo.currentText()
+        npm_choice = npm_combo.currentText()
+        pip_choice = pip_combo.currentText()
+        snap_choice = snap_combo.currentText()
+        yarn_choice = yarn_combo.currentText()
         
         # 检查是否有选择任何配置
         if all(choice == "不修改 / Keep current" for choice in [apt_choice, npm_choice, pip_choice, snap_choice, yarn_choice]):
-            messagebox.showwarning("警告", "未选择任何镜像源 / No mirror selected")
+            msg = QMessageBox(parent)
+            msg.setWindowTitle("警告 / Warning")
+            msg.setText("未选择任何镜像源 / No mirror selected")
+            msg.exec()
             return
         
         # 确认对话框
-        if messagebox.askyesno("确认", "将备份当前配置并应用新镜像源。\nThis will backup current config and apply new mirrors.\n\n继续？/Continue?"):
-            log_text.insert(tk.END, "开始配置... / Configuring...\n")
+        confirm = QMessageBox(parent)
+        confirm.setWindowTitle("确认 / Confirm")
+        confirm.setText("将备份当前配置并应用新镜像源。\nThis will backup current config and apply new mirrors.\n\n继续？/Continue?")
+        confirm.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        confirm.setDefaultButton(QMessageBox.StandardButton.No)
+        
+        if confirm.exec() == QMessageBox.StandardButton.Yes:
+            # 使用工作线程执行配置应用
+            worker = ConfigWorker(mirror_manager, apt_choice, npm_choice, pip_choice, snap_choice, yarn_choice)
             
-            # 实际应用配置（仅在支持的平台上）
-            try:
-                # 检查是否在Linux系统上应用Linux特定配置
-                if os.name == 'nt':  # Windows
-                    # 在Windows上，只应用NPM、Pip、Yarn配置，跳过APT和Snap
-                    if apt_choice != "不修改 / Keep current":
-                        log_text.insert(tk.END, "⚠️ APT 配置仅支持Linux系统 / APT config only supports Linux\n")
-                    if snap_choice != "不修改 / Keep current":
-                        log_text.insert(tk.END, "⚠️ Snap 配置仅支持Linux系统 / Snap config only supports Linux\n")
-                    
-                    # 只应用NPM、Pip、Yarn配置
-                    if npm_choice != "不修改 / Keep current":
-                        log_text.insert(tk.END, "✅ NPM 配置已应用 (模拟) / NPM config applied (simulated)\n")
-                    if pip_choice != "不修改 / Keep current":
-                        log_text.insert(tk.END, "✅ Pip 配置已应用 (模拟) / Pip config applied (simulated)\n")
-                    if yarn_choice != "不修改 / Keep current":
-                        log_text.insert(tk.END, "✅ Yarn 配置已应用 (模拟) / Yarn config applied (simulated)\n")
-                else:  # Linux
-                    # 在Linux上应用所有配置
-                    if apt_choice != "不修改 / Keep current":
-                        log_text.insert(tk.END, "✅ APT 配置已应用 (模拟) / APT config applied (simulated)\n")
-                    if npm_choice != "不修改 / Keep current":
-                        log_text.insert(tk.END, "✅ NPM 配置已应用 (模拟) / NPM config applied (simulated)\n")
-                    if pip_choice != "不修改 / Keep current":
-                        log_text.insert(tk.END, "✅ Pip 配置已应用 (模拟) / Pip config applied (simulated)\n")
-                    if yarn_choice != "不修改 / Keep current":
-                        log_text.insert(tk.END, "✅ Yarn 配置已应用 (模拟) / Yarn config applied (simulated)\n")
-                    if snap_choice != "不修改 / Keep current":
-                        log_text.insert(tk.END, "✅ Snap 配置已应用 (模拟) / Snap config applied (simulated)\n")
+            def on_finished(success, message):
+                if success:
+                    msg = QMessageBox(parent)
+                    msg.setWindowTitle("完成 / Completed")
+                    msg.setText(message)
+                    msg.exec()
+                else:
+                    msg = QMessageBox(parent)
+                    msg.setWindowTitle("错误 / Error")
+                    msg.setText(message)
+                    msg.exec()
                 
-                log_text.insert(tk.END, "配置完成 / Configuration completed\n")
-            except Exception as e:
-                log_text.insert(tk.END, f"❌ 配置失败: {str(e)} / Config failed: {str(e)}\n")
+                refresh_status()
             
-            log_text.see(tk.END)
-            refresh_status()
+            worker.finished.connect(on_finished)
+            worker.start()
     
-    apply_btn = ttk.Button(main_frame, text="应用配置 / Apply Config", command=apply_config)
-    apply_btn.grid(row=2, column=0, pady=10)
+    apply_btn = QPushButton("应用配置 / Apply Config")
+    apply_btn.clicked.connect(apply_config)
     
     # 日志区域
-    log_frame = ttk.LabelFrame(main_frame, text="操作日志 / Operation Log", padding="10")
-    log_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0))
-    log_frame.columnconfigure(0, weight=1)
-    log_frame.rowconfigure(0, weight=1)
+    log_group = QGroupBox("操作日志 / Operation Log")
+    log_layout = QVBoxLayout(log_group)
     
-    log_text = scrolledtext.ScrolledText(log_frame, height=8, width=70)
-    log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+    log_text = QTextEdit()
+    log_text.setMinimumHeight(150)
+    log_layout.addWidget(log_text)
+    
+    # 添加所有组件到主布局
+    main_layout.addWidget(status_group)
+    main_layout.addWidget(select_group)
+    main_layout.addWidget(apply_btn)
+    main_layout.addWidget(log_group)
     
     # 刷新初始状态
     refresh_status()
     
-    # 设置窗口关闭行为
-    def on_closing():
-        root.destroy()
-    
-    root.protocol("WM_DELETE_WINDOW", on_closing)
-    
-    # 如果是模态对话框，启用并等待
-    if parent:
-        root.transient(parent)
-        root.grab_set()
-    
-    root.mainloop() if parent is None else root.wait_window()
+    # 显示对话框
+    dialog.exec()
 
 
 if __name__ == "__main__":
     # 测试用
+    app = QApplication([])
     show_mirror_settings()
+    app.exec()

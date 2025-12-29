@@ -98,6 +98,19 @@ A: 镜像源管理功能会自动备份当前配置，最多保留5个备份。
 
 MIT License
 
+## CI/CD
+
+本项目使用 GitHub Actions 进行持续集成和部署：
+
+- **测试**: 每次推送和拉取请求时运行测试
+- **代码质量**: 自动进行代码格式检查和类型检查
+- **安全扫描**: 定期扫描代码和依赖的安全漏洞
+- **构建和发布**: 当创建标签时自动构建Windows和Linux发行版
+
+## 贡献 / Contributing
+
+欢迎提交 Issue 和 Pull Request。
+
 ## 贡献 / Contributing
 
 欢迎提交 Issue 和 Pull Request。

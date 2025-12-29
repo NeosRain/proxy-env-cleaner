@@ -254,6 +254,8 @@ class LinuxCleaner(BaseCleaner):
                 try:
                     if self._clean_proxy_from_file(env_file):
                         cleaned_files.append(str(env_file))
+                except PermissionError:
+                    logger.warning(f"Permission denied when cleaning {env_file}, skipping...")
                 except Exception as e:
                     logger.error(f"Failed to clean {env_file}: {e}")
         
@@ -348,7 +350,7 @@ class LinuxCleaner(BaseCleaner):
         
         try:
             # Need root permission / 需要 root 权限
-            if os.geteuid() == 0:
+            if os.name != 'nt' and os.geteuid() == 0:
                 self.APT_PROXY_FILE.unlink()
                 logger.info("APT proxy cleaned successfully")
                 return CleanResult(
