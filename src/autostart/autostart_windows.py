@@ -7,7 +7,6 @@ from pathlib import Path
 
 from ..utils.logger import logger
 
-
 def get_app_path() -> str:
     """Get application executable path / 获取应用程序可执行文件路径"""
     if getattr(sys, 'frozen', False):
@@ -17,7 +16,6 @@ def get_app_path() -> str:
         # Running as script / 作为脚本运行
         main_py = str(Path(__file__).parent.parent / "main.py")
         return f'{sys.executable} "{main_py}"'
-
 
 def enable_autostart() -> bool:
     """Enable autostart on Windows / 启用 Windows 开机自启"""
@@ -39,7 +37,6 @@ def enable_autostart() -> bool:
     except Exception as e:
         logger.error(f"Failed to enable Windows autostart: {e}")
         return False
-
 
 def disable_autostart() -> bool:
     """Disable autostart on Windows / 禁用 Windows 开机自启"""
@@ -64,7 +61,6 @@ def disable_autostart() -> bool:
     except Exception as e:
         logger.error(f"Failed to disable Windows autostart: {e}")
         return False
-
 
 def is_autostart_enabled() -> bool:
     """Check if autostart is enabled on Windows / 检查 Windows 开机自启是否启用"""

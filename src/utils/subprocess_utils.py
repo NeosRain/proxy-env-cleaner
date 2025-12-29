@@ -10,10 +10,9 @@ if os.name == 'nt':
 else:
     SUBPROCESS_CREATE_FLAGS = 0
 
-
 def run_hidden(*args, **kwargs):
     """Run subprocess with hidden window / 运行隐藏窗口的子进程"""
-    if os.name == 'nt':
+    if os.name == 'nt':  # Only apply flags on Windows
         if 'creationflags' not in kwargs:
             kwargs['creationflags'] = SUBPROCESS_CREATE_FLAGS
         else:

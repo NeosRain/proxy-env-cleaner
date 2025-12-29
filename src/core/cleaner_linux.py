@@ -17,11 +17,8 @@ from ..utils.logger import logger
 from ..utils.config import get_config_dir
 
 # 隐藏 subprocess 窗口的全局配置 / Global config to hide subprocess windows
-if os.name == 'nt':
-    SUBPROCESS_FLAGS = subprocess.CREATE_NO_WINDOW
-else:
-    SUBPROCESS_FLAGS = 0
-
+# This was a leftover from Windows code - Linux doesn't need this
+SUBPROCESS_FLAGS = 0  # Remove this as we use run_hidden from subprocess_utils instead
 
 class LinuxCleaner(BaseCleaner):
     """Linux proxy cleaner / Linux 代理清理器"""

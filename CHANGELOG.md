@@ -6,6 +6,51 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.1.0] - 2025-12-29
+
+### 🎉 新版本发布 / New Release
+
+#### ✨ 新功能 / New Features
+
+**镜像源管理功能增强:**
+- ✅ 镜像源测速功能 - 支持对各镜像站进行自动测速和延迟检查
+- ✅ 实时获取镜像站 - 支持从本地配置文件而非网络获取镜像地址
+- ✅ GUI测速显示 - 在图形界面上显示测速结果和延迟信息
+- ✅ 镜像源自动排序 - 根据测速结果自动排序显示
+
+**系统托盘和界面改进:**
+- ✅ 主题自适应 - 状态文本框根据系统主题自动切换背景色和文字颜色
+- ✅ 详细状态显示 - 明确显示哪个应用被代理及清理了什么环境
+- ✅ 测速按钮 - GUI中添加镜像源测速按钮
+
+#### 🔧 功能改进 / Improvements
+
+**代码架构优化:**
+- ✅ 统一镜像管理器 - 移除GUI中重复的MirrorManager类，统一使用核心模块
+- ✅ 真实配置应用 - ConfigWorker现在调用核心模块的真实配置方法，而非模拟执行
+- ✅ 跨平台兼容性 - 改进Windows和Linux代码隔离，避免跨平台功能错误
+- ✅ 错误处理增强 - 改进错误日志，包含平台信息
+
+**性能和稳定性:**
+- ✅ 减少GUI闪退 - 修复可能导致GUI闪退的潜在问题
+- ✅ 优化测速算法 - 提供更准确的延迟检测
+- ✅ 资源管理优化 - 改进内存和资源使用
+
+#### 🐛 问题修复 / Bug Fixes
+
+- 🔧 修复Windows清理器中缺失的is_windows导入问题
+- 🔧 修复GUI中重复的MirrorManager类定义问题
+- 🔧 修复Linux/WSL2环境下的功能兼容性问题
+- 🔧 修复配置应用逻辑，使其真正应用而非模拟执行
+
+#### 📦 技术栈更新 / Tech Stack Updates
+
+- ✅ 镜像源配置本地化 - 从本地mirrors.json文件获取配置，而非网络
+- ✅ PyQt6主题适配 - 改进GUI主题自适应能力
+- ✅ 跨平台检测优化 - 使用统一的平台检测工具函数
+
+---
+
 ## [1.0.0] - 2025-12-28
 
 ### 🎉 首次发布 / Initial Release
@@ -101,4 +146,5 @@ Thanks to all contributors who have helped with this project!
 
 ---
 
+[1.1.0]: https://github.com/NeosRain/proxy-env-cleaner/releases/tag/v1.1.0
 [1.0.0]: https://github.com/NeosRain/proxy-env-cleaner/releases/tag/v1.0.0

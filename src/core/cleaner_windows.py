@@ -12,7 +12,7 @@ from .cleaner_base import (
 )
 from ..utils.logger import logger
 from ..utils.subprocess_utils import run_hidden
-
+from ..utils.platform_utils import is_windows
 
 class WindowsCleaner(BaseCleaner):
     """Windows proxy cleaner / Windows 代理清理器"""
@@ -212,7 +212,8 @@ class WindowsCleaner(BaseCleaner):
                     del os.environ[var]
                 
                 # Clean from user environment (registry) / 从用户环境清理（注册表）
-                self._remove_user_env_var(var)
+                if is_windows():  # Only on Windows
+                    self._remove_user_env_var(var)
                 cleaned.append(var)
             except Exception as e:
                 logger.error(f"Failed to clean env var {var}: {e}")

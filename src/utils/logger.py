@@ -8,7 +8,6 @@ from pathlib import Path
 
 from .platform_utils import is_windows
 
-
 def get_log_dir() -> Path:
     """Get log directory / 获取日志目录"""
     if is_windows():
@@ -19,7 +18,6 @@ def get_log_dir() -> Path:
     log_dir = base / "ClashEnvCleaner" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     return log_dir
-
 
 def setup_logger(name: str = "ClashEnvCleaner") -> logging.Logger:
     """Setup and return logger / 设置并返回日志记录器"""
@@ -51,7 +49,6 @@ def setup_logger(name: str = "ClashEnvCleaner") -> logging.Logger:
         logger.addHandler(file_handler)
     
     return logger
-
 
 # Global logger instance / 全局日志实例
 logger = setup_logger()

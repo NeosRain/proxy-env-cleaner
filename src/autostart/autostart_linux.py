@@ -7,7 +7,6 @@ from pathlib import Path
 
 from ..utils.logger import logger
 
-
 DESKTOP_ENTRY_TEMPLATE = """[Desktop Entry]
 Type=Application
 Name=Clash Env Cleaner
@@ -22,16 +21,13 @@ StartupNotify=false
 X-GNOME-Autostart-enabled=true
 """
 
-
 def get_autostart_dir() -> Path:
     """Get autostart directory / 获取自启动目录"""
     return Path.home() / ".config" / "autostart"
 
-
 def get_desktop_file_path() -> Path:
     """Get desktop entry file path / 获取桌面条目文件路径"""
     return get_autostart_dir() / "clash-env-cleaner.desktop"
-
 
 def get_app_path() -> str:
     """Get application executable path / 获取应用程序可执行文件路径"""
@@ -42,7 +38,6 @@ def get_app_path() -> str:
         # Running as script / 作为脚本运行
         main_py = Path(__file__).parent.parent / "main.py"
         return f"{sys.executable} {main_py}"
-
 
 def enable_autostart() -> bool:
     """Enable autostart on Linux / 启用 Linux 开机自启"""
@@ -65,7 +60,6 @@ def enable_autostart() -> bool:
         logger.error(f"Failed to enable Linux autostart: {e}")
         return False
 
-
 def disable_autostart() -> bool:
     """Disable autostart on Linux / 禁用 Linux 开机自启"""
     try:
@@ -78,7 +72,6 @@ def disable_autostart() -> bool:
     except Exception as e:
         logger.error(f"Failed to disable Linux autostart: {e}")
         return False
-
 
 def is_autostart_enabled() -> bool:
     """Check if autostart is enabled on Linux / 检查 Linux 开机自启是否启用"""

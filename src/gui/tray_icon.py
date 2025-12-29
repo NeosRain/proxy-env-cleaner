@@ -13,7 +13,6 @@ from ..core.detector import clean_all_proxy
 from ..core.cleaner_base import CleanReport
 from ..utils.logger import logger
 
-
 class TrayIcon(QObject):
     """System tray icon manager / 系统托盘图标管理器"""
     

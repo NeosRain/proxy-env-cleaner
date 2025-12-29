@@ -11,6 +11,9 @@ import tarfile
 import subprocess
 import urllib.request
 import urllib.error
+import time
+import socket
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -20,17 +23,17 @@ from enum import Enum
 from ..utils.logger import logger
 from ..utils.config import get_config_dir
 
-
 # 在线配置 URL / Online config URL
 ONLINE_CONFIG_URL = "https://raw.githubusercontent.com/NeosRain/proxy-env-cleaner/main/mirrors.json"
 
+# 本地配置文件路径 / Local config file path
+LOCAL_CONFIG_PATH = Path(__file__).parent.parent.parent / "mirrors.json"
 
 class DistroType(Enum):
     """Linux distribution type / Linux 发行版类型"""
     DEBIAN = "debian"
     UBUNTU = "ubuntu"
     UNKNOWN = "unknown"
-
 
 class ReleaseType(Enum):
     """Release type / 发行版本类型"""
@@ -45,7 +48,6 @@ class ReleaseType(Enum):
     ORACULAR = "oracular"   # 24.10
     UNKNOWN = "unknown"
 
-
 class MirrorProvider(Enum):
     """Mirror provider / 镜像源提供商"""
     TSINGHUA = "tsinghua"       # 清华源
@@ -55,7 +57,6 @@ class MirrorProvider(Enum):
     TENCENT = "tencent"         # 腾讯源
     OFFICIAL = "official"       # 官方源
 
-
 @dataclass
 class SourceInfo:
     """Source information / 源信息"""
@@ -63,7 +64,6 @@ class SourceInfo:
     release: str
     components: List[str]
     is_deb_src: bool = False
-
 
 @dataclass
 class MirrorConfig:
@@ -76,7 +76,6 @@ class MirrorConfig:
     pip_trusted_host: str
     snap_url: str = ""
     git_url: str = ""
-
 
 # Mirror providers configuration / 镜像源提供商配置
 MIRROR_PROVIDERS: Dict[MirrorProvider, MirrorConfig] = {
@@ -132,34 +131,30 @@ MIRROR_PROVIDERS: Dict[MirrorProvider, MirrorConfig] = {
     ),
 }
 
-
-def fetch_online_mirrors() -> Optional[Dict]:
-    """从网上获取最新镜像源配置 / Fetch latest mirror config from online"""
+def fetch_local_mirrors() -> Optional[Dict]:
+    """从本地文件获取镜像源配置 / Fetch mirror config from local file"""
     try:
-        req = urllib.request.Request(
-            ONLINE_CONFIG_URL,
-            headers={'User-Agent': 'ProxyEnvCleaner/1.0'}
-        )
-        with urllib.request.urlopen(req, timeout=10) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            logger.info("已获取在线镜像源配置 / Online mirror config fetched")
-            return data
-    except urllib.error.URLError as e:
-        logger.warning(f"无法获取在线配置 / Cannot fetch online config: {e}")
+        if LOCAL_CONFIG_PATH.exists():
+            with open(LOCAL_CONFIG_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                logger.info("已获取本地镜像源配置 / Local mirror config fetched")
+                return data
+        else:
+            logger.warning(f"本地配置文件不存在: {LOCAL_CONFIG_PATH} / Local config file does not exist")
+            return None
     except json.JSONDecodeError as e:
-        logger.warning(f"解析在线配置失败 / Failed to parse online config: {e}")
+        logger.warning(f"解析本地配置失败 / Failed to parse local config: {e}")
     except Exception as e:
-        logger.warning(f"获取在线配置异常 / Error fetching online config: {e}")
+        logger.warning(f"读取本地配置异常 / Error reading local config: {e}")
     return None
 
-
-def get_mirror_config(provider: MirrorProvider, online_data: Optional[Dict] = None) -> MirrorConfig:
-    """获取镜像源配置，优先使用在线数据 / Get mirror config, prefer online data"""
-    # 使用在线数据优先 / Use online data first
-    if online_data and 'providers' in online_data:
+def get_mirror_config(provider: MirrorProvider, local_data: Optional[Dict] = None) -> MirrorConfig:
+    """获取镜像源配置，优先使用本地数据 / Get mirror config, prefer local data"""
+    # 使用本地数据优先 / Use local data first
+    if local_data and 'providers' in local_data:
         provider_key = provider.value
-        if provider_key in online_data['providers']:
-            p = online_data['providers'][provider_key]
+        if provider_key in local_data['providers']:
+            p = local_data['providers'][provider_key]
             return MirrorConfig(
                 name=p.get('name', MIRROR_PROVIDERS[provider].name),
                 name_zh=p.get('name_zh', MIRROR_PROVIDERS[provider].name_zh),
@@ -172,7 +167,6 @@ def get_mirror_config(provider: MirrorProvider, online_data: Optional[Dict] = No
             )
     # 回退到本地配置 / Fallback to local config
     return MIRROR_PROVIDERS[provider]
-
 
 class MirrorManager:
     """Mirror source manager / 镜像源管理器"""
@@ -789,11 +783,70 @@ trusted-host = {config.pip_trusted_host}
         
         return results
 
+    def test_url_connectivity(self, url: str, timeout: int = 5) -> Tuple[bool, float, str]:
+        """
+        测试URL连接性 / Test URL connectivity
+        返回: (是否成功, 延迟时间(秒), 错误信息)
+        Return: (success, latency(seconds), error_message)
+        """
+        try:
+            start_time = time.time()
+            # 尝试创建一个简单的HTTP请求来测试连接
+            req = urllib.request.Request(url, headers={'User-Agent': 'ProxyEnvCleaner/1.0'})
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                end_time = time.time()
+                latency = end_time - start_time
+                return True, latency, ""
+        except Exception as e:
+            return False, 0, str(e)
+
+    def test_mirror_speed(self, provider: MirrorProvider, test_urls: Optional[List[str]] = None) -> Dict[str, Tuple[bool, float, str]]:
+        """
+        测试镜像源速度 / Test mirror speed for different package managers
+        返回: {类型: (是否成功, 延迟时间, 错误信息)} / Return: {type: (success, latency, error_msg)}
+        """
+        config = MIRROR_PROVIDERS[provider]
+        if test_urls is None:
+            # 默认测试URL列表
+            test_urls = {
+                "apt": config.apt_url if config.apt_url else "",
+                "npm": config.npm_registry if config.npm_registry else "",
+                "pip": config.pip_index if config.pip_index else "",
+                "git": config.git_url if config.git_url else "",
+            }
+        else:
+            # 如果提供了特定的URL列表，则使用该列表
+            test_urls = {f"custom_{i}": url for i, url in enumerate(test_urls)}
+
+        results = {}
+        for url_type, url in test_urls.items():
+            if url:
+                # 确保URL以http或https开头
+                if not url.startswith(('http://', 'https://')):
+                    url = 'https://' + url
+                # 如果是索引URL，添加一个基本路径以测试
+                if url_type in ["pip", "npm"] and not url.endswith('/'):
+                    url += '/'
+                results[url_type] = self.test_url_connectivity(url)
+            else:
+                results[url_type] = (False, 0, "URL not configured")
+        return results
+
+    def test_all_mirrors_speed(self) -> Dict[MirrorProvider, Dict[str, Tuple[bool, float, str]]]:
+        """
+        测试所有镜像源的速度 / Test speed of all mirrors
+        返回: {镜像提供商: {类型: (是否成功, 延迟时间, 错误信息)}}
+        Return: {mirror_provider: {type: (success, latency, error_msg)}}
+        """
+        results = {}
+        for provider in MirrorProvider:
+            if provider != MirrorProvider.OFFICIAL:  # 通常不测试官方源
+                results[provider] = self.test_mirror_speed(provider)
+        return results
 
 def get_mirror_manager() -> MirrorManager:
     """Get mirror manager instance / 获取镜像源管理器实例"""
     return MirrorManager()
-
 
 def get_available_providers() -> List[Tuple[MirrorProvider, str, str]]:
     """Get available mirror providers / 获取可用的镜像源提供商"""

@@ -6,14 +6,12 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 from enum import Enum
 
-
 class CleanStatus(Enum):
     """Clean status enum / 清理状态枚举"""
     SUCCESS = "success"         # 成功 / Success
     FAILED = "failed"           # 失败 / Failed
     SKIPPED = "skipped"         # 跳过 / Skipped
     NOT_FOUND = "not_found"     # 未找到 / Not found
-
 
 @dataclass
 class CleanResult:
@@ -28,7 +26,6 @@ class CleanResult:
         """Get bilingual message / 获取双语消息"""
         return f"{self.message_zh} / {self.message_en}"
 
-
 @dataclass
 class DetectResult:
     """Detection result / 检测结果"""
@@ -37,7 +34,6 @@ class DetectResult:
     value: Optional[str] = None # 当前值 / Current value
     message_zh: str = ""        # 中文消息 / Chinese message
     message_en: str = ""        # 英文消息 / English message
-
 
 @dataclass
 class CleanReport:
@@ -68,7 +64,6 @@ class CleanReport:
     def get_summary(self) -> str:
         """Get bilingual summary / 获取双语摘要"""
         return f"{self.get_summary_zh()}\n{self.get_summary_en()}"
-
 
 class BaseCleaner(ABC):
     """Base cleaner abstract class / 清理器抽象基类"""

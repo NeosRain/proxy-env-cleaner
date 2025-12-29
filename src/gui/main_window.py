@@ -14,10 +14,10 @@ from PyQt6.QtCore import Qt, QTimer
 from .tray_icon import TrayIcon
 from .mirror_dialog import show_mirror_settings
 from ..core.detector import detect_proxy_settings, clean_all_proxy, get_cleaner
+from ..core.mirror_manager import get_mirror_manager, MirrorProvider, fetch_local_mirrors
 from ..core.cleaner_base import CleanReport, DetectResult, CleanStatus
 from ..utils.config import config
 from ..utils.logger import logger
-
 
 class MainWindow(QMainWindow):
     """Main application window / 主应用窗口"""
@@ -73,6 +73,9 @@ class MainWindow(QMainWindow):
                 font-family: Consolas, Monaco, monospace;
             }
         """)
+        
+        # Apply system theme adaptive styling
+        self._apply_theme_styling()
         status_layout.addWidget(self.status_text)
         
         # Refresh button / 刷新按钮
@@ -194,6 +197,30 @@ class MainWindow(QMainWindow):
         mirror_btn.clicked.connect(self._open_mirror_settings)
         layout.addWidget(mirror_btn)
         
+        # Speed test button / 测速按钮
+        speed_test_btn = QPushButton("镜像源测速 / Mirror Speed Test")
+        speed_test_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f39c12;
+                color: white;
+                border: none;
+                padding: 10px 25px;
+                border-radius: 5px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #e67e22;
+            }
+            QPushButton:pressed {
+                background-color: #d35400;
+                padding-top: 12px;
+                padding-bottom: 8px;
+            }
+        """)
+        speed_test_btn.clicked.connect(self._test_mirror_speeds)
+        layout.addWidget(speed_test_btn)
+        
         # Log group / 日志分组
         log_group = QGroupBox("操作日志 / Operation Log")
         log_layout = QVBoxLayout(log_group)
@@ -220,6 +247,58 @@ class MainWindow(QMainWindow):
         layout.setStretch(2, 0)  # Options
         layout.setStretch(3, 0)  # Buttons
         layout.setStretch(4, 2)  # Log
+    
+    def _apply_theme_styling(self) -> None:
+        """Apply system theme adaptive styling / 应用系统主题自适应样式"""
+        # 根据系统主题自动调整文本框样式
+        try:
+            from PyQt6.QtWidgets import QStyleFactory
+            from PyQt6.QtGui import QPalette
+            
+            # 获取系统调色板
+            palette = self.palette()
+            bg_color = palette.color(QPalette.ColorRole.Window)
+            text_color = palette.color(QPalette.ColorRole.WindowText)
+            
+            # 计算亮度，判断是否为深色主题
+            brightness = (bg_color.red() * 299 + bg_color.green() * 587 + bg_color.blue() * 114) / 1000
+            
+            if brightness < 128:  # 深色主题
+                self.status_text.setStyleSheet("""
+                    QTextEdit {
+                        background-color: #1e1e1e;
+                        color: #e0e0e0;
+                        border: 1px solid #444;
+                        border-radius: 5px;
+                        padding: 10px;
+                        font-family: Consolas, Monaco, monospace;
+                    }
+                """)
+            else:  # 浅色主题
+                self.status_text.setStyleSheet("""
+                    QTextEdit {
+                        background-color: #ffffff;
+                        color: #000000;
+                        border: 1px solid #cccccc;
+                        border-radius: 5px;
+                        padding: 10px;
+                        font-family: Consolas, Monaco, monospace;
+                    }
+                """)
+        except Exception as e:
+            # 如果无法获取系统主题，使用默认深色主题
+            self.status_text.setStyleSheet("""
+                QTextEdit {
+                    background-color: #1e1e1e;
+                    color: #e0e0e0;
+                    border: 1px solid #444;
+                    border-radius: 5px;
+                    padding: 10px;
+                    font-family: Consolas, Monaco, monospace;
+                }
+            """)
+            import traceback
+            print(f"Theme styling error: {e}\n{traceback.format_exc()}")
     
     def _setup_tray(self) -> None:
         """Setup system tray / 设置系统托盘"""
@@ -265,8 +344,47 @@ class MainWindow(QMainWindow):
         for result in results:
             if result.found:
                 found_any = True
-                self.status_text.append(f"⚠️ {result.message_zh}")
-                self.status_text.append(f"   {result.message_en}")
+                # 显示更详细的信息，明确指出哪个应用被代理以及清理了什么环境
+                if result.item == "system_proxy":
+                    self.status_text.append(f"⚠️ [系统代理] {result.message_zh}")
+                    self.status_text.append(f"   [System Proxy] {result.message_en}")
+                elif result.item.startswith("env_"):
+                    var_name = result.item[4:]
+                    self.status_text.append(f"⚠️ [环境变量] {result.message_zh}")
+                    self.status_text.append(f"   [Environment Variable] {result.message_en}")
+                elif result.item == "git_proxy":
+                    self.status_text.append(f"⚠️ [Git配置] {result.message_zh}")
+                    self.status_text.append(f"   [Git Config] {result.message_en}")
+                elif result.item == "npm_proxy":
+                    self.status_text.append(f"⚠️ [NPM配置] {result.message_zh}")
+                    self.status_text.append(f"   [NPM Config] {result.message_en}")
+                elif result.item == "yarn_proxy":
+                    self.status_text.append(f"⚠️ [Yarn配置] {result.message_zh}")
+                    self.status_text.append(f"   [Yarn Config] {result.message_en}")
+                elif result.item == "pip_proxy":
+                    self.status_text.append(f"⚠️ [Pip配置] {result.message_zh}")
+                    self.status_text.append(f"   [Pip Config] {result.message_en}")
+                elif result.item == "apt_proxy":
+                    self.status_text.append(f"⚠️ [APT源] {result.message_zh}")
+                    self.status_text.append(f"   [APT Source] {result.message_en}")
+                elif result.item == "uwp_loopback":
+                    self.status_text.append(f"⚠️ [UWP回环] {result.message_zh}")
+                    self.status_text.append(f"   [UWP Loopback] {result.message_en}")
+                elif result.item == "kde_apps_proxy":
+                    self.status_text.append(f"⚠️ [KDE应用] {result.message_zh}")
+                    self.status_text.append(f"   [KDE Apps] {result.message_en}")
+                elif result.item == "sources_proxy":
+                    self.status_text.append(f"⚠️ [软件源] {result.message_zh}")
+                    self.status_text.append(f"   [Software Sources] {result.message_en}")
+                elif result.item == "wget_proxy":
+                    self.status_text.append(f"⚠️ [Wget配置] {result.message_zh}")
+                    self.status_text.append(f"   [Wget Config] {result.message_en}")
+                elif result.item == "curl_proxy":
+                    self.status_text.append(f"⚠️ [Curl配置] {result.message_zh}")
+                    self.status_text.append(f"   [Curl Config] {result.message_en}")
+                else:
+                    self.status_text.append(f"⚠️ [{result.item}] {result.message_zh}")
+                    self.status_text.append(f"   [{result.item}] {result.message_en}")
                 self.status_text.append("")
         
         if not found_any:
@@ -328,6 +446,73 @@ class MainWindow(QMainWindow):
         # Scroll to bottom / 滚动到底部
         scrollbar = self.log_text.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
+    
+    def _test_mirror_speeds(self) -> None:
+        """测试所有镜像源速度 / Test all mirror speeds"""
+        try:
+            from PyQt6.QtWidgets import QProgressDialog
+            from PyQt6.QtCore import QThread, pyqtSignal
+            
+            # 创建进度对话框
+            progress = QProgressDialog("正在测试镜像源速度...", "取消", 0, 100, self)
+            progress.setWindowTitle("测速中...")
+            progress.setCancelButton(None)  # 暂时不允许取消，因为测速过程复杂
+            progress.show()
+            
+            self._log("开始测试镜像源速度... / Testing mirror speeds...")
+            
+            # 获取镜像管理器并测试所有镜像源
+            mirror_manager = get_mirror_manager()
+            results = mirror_manager.test_all_mirrors_speed()
+            
+            # 显示结果
+            self.status_text.clear()
+            self.status_text.append("镜像源测速结果 / Mirror Speed Test Results")
+            self.status_text.append("=" * 50)
+            
+            # 按延迟时间排序结果
+            sorted_results = {}
+            for provider, provider_results in results.items():
+                # 计算平均延迟时间
+                total_latency = 0
+                count = 0
+                for url_type, (success, latency, error) in provider_results.items():
+                    if success:
+                        total_latency += latency
+                        count += 1
+                
+                avg_latency = total_latency / count if count > 0 else float('inf')
+                sorted_results[provider] = (avg_latency, provider_results)
+            
+            # 按平均延迟排序
+            sorted_providers = sorted(sorted_results.items(), key=lambda x: x[1][0])
+            
+            for provider, (avg_latency, provider_results) in sorted_providers:
+                # 从MirrorProvider枚举获取配置信息
+                from ..core.mirror_manager import MIRROR_PROVIDERS
+                config = MIRROR_PROVIDERS[provider]
+                self.status_text.append(f"\n【{config.name_zh} - {config.name}】")
+                
+                if avg_latency == float('inf'):
+                    self.status_text.append("  ❌ 无法连接 / Cannot connect")
+                else:
+                    self.status_text.append(f"  📊 平均延迟 / Avg latency: {avg_latency:.3f}s ({avg_latency*1000:.1f}ms)")
+                
+                for url_type, (success, latency, error) in provider_results.items():
+                    if success:
+                        self.status_text.append(f"    ✅ {url_type}: {latency:.3f}s ({latency*1000:.1f}ms)")
+                    else:
+                        self.status_text.append(f"    ❌ {url_type}: Error - {error}")
+                
+                self.status_text.append("-" * 30)
+            
+            self._log("镜像源测速完成 / Mirror speed test completed")
+            progress.close()
+            
+        except Exception as e:
+            self._log(f"❌ 测速失败: {str(e)} / Speed test failed: {str(e)}")
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "错误 / Error", f"测速失败:\nSpeed test failed:\n{str(e)}")
     
     def closeEvent(self, event: QCloseEvent) -> None:
         """Handle window close event / 处理窗口关闭事件"""

@@ -17,7 +17,6 @@ from src.utils.config import config
 from src.utils.logger import logger
 from src.utils.platform_utils import is_windows, is_linux
 
-
 def setup_autostart():
     """Setup autostart based on config / 根据配置设置开机自启"""
     if is_windows():
@@ -31,7 +30,6 @@ def setup_autostart():
         enable_autostart()
         logger.info("Autostart enabled / 开机自启已启用")
 
-
 def auto_clean_on_startup():
     """Auto clean on startup if configured / 如果配置了则启动时自动清理"""
     if config.get("auto_clean_on_startup"):
@@ -39,7 +37,6 @@ def auto_clean_on_startup():
         report = clean_all_proxy()
         if report:
             logger.info(report.get_summary_en())
-
 
 def main():
     """Main entry point / 主入口点"""
@@ -70,7 +67,6 @@ def main():
     
     # Run event loop / 运行事件循环
     sys.exit(app.exec())
-
 
 if __name__ == "__main__":
     main()

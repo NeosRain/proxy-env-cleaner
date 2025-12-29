@@ -8,7 +8,6 @@ from typing import Any, Dict
 
 from .platform_utils import is_windows
 
-
 DEFAULT_CONFIG = {
     "auto_clean_on_startup": True,      # 开机自动清理 / Auto clean on startup
     "show_notification": True,           # 显示通知 / Show notification
@@ -19,7 +18,6 @@ DEFAULT_CONFIG = {
     "minimize_to_tray": True,            # 最小化到托盘 / Minimize to tray
     "language": "bilingual",             # 语言: bilingual/zh/en
 }
-
 
 def get_config_dir() -> Path:
     """Get config directory / 获取配置目录"""
@@ -32,11 +30,9 @@ def get_config_dir() -> Path:
     config_dir.mkdir(parents=True, exist_ok=True)
     return config_dir
 
-
 def get_config_file() -> Path:
     """Get config file path / 获取配置文件路径"""
     return get_config_dir() / "config.json"
-
 
 class Config:
     """Configuration manager class / 配置管理类"""
@@ -81,7 +77,6 @@ class Config:
     def get_all(self) -> Dict[str, Any]:
         """Get all config / 获取所有配置"""
         return self._config.copy()
-
 
 # Global config instance / 全局配置实例
 config = Config()
