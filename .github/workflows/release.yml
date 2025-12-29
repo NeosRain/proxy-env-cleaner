@@ -52,7 +52,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-pyqt6 dpkg-dev
+        sudo apt-get install -y python3-pyqt6 dpkg-dev libegl1 libopengl0 libxcb-cursor0
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
